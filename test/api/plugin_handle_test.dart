@@ -1,0 +1,74 @@
+import 'package:genkit_omlx/genkit_omlx.dart';
+import 'package:test/test.dart';
+
+void main() {
+  group('OmlxPluginHandle', () {
+    test('creates plugin instance with default options', () {
+      final plugin = omlx();
+      expect(plugin.name, equals('omlx'));
+      expect(plugin.clientManager.baseUrl, equals('http://localhost:8000'));
+      expect(plugin.clientManager.apiKey, isNull);
+    });
+
+    test('creates plugin instance with custom baseUrl and apiKey', () {
+      final plugin = omlx(
+        baseUrl: 'http://192.168.1.50:8000',
+        apiKey: 'secret-token',
+      );
+      expect(plugin.clientManager.baseUrl, equals('http://192.168.1.50:8000'));
+      expect(plugin.clientManager.apiKey, equals('secret-token'));
+    });
+
+    test('creates typed model reference', () {
+      final ref = omlx.model('qwen');
+      expect(ref.name, equals('omlx/qwen'));
+    });
+
+    test('creates typed model reference with config', () {
+      final ref = omlx.model(
+        'qwen',
+        config: const OmlxGenerationConfig(temperature: 0.5),
+      );
+      expect(ref.name, equals('omlx/qwen'));
+      expect(ref.config?.temperature, equals(0.5));
+    });
+
+    test('creates typed embedder reference', () {
+      final ref = omlx.embedder('bge-micro');
+      expect(ref.name, equals('omlx/bge-micro'));
+    });
+  });
+
+  group('OmlxModelDefinition', () {
+    test('defaults model to name when model is omitted', () {
+      const def = OmlxModelDefinition(name: 'qwen-4bit');
+      expect(def.name, equals('qwen-4bit'));
+      expect(def.model, equals('qwen-4bit'));
+      expect(def.supportsTools, isTrue);
+      expect(def.supportsConstrainedOutput, isTrue);
+      expect(def.supportsMedia, isTrue);
+    });
+
+    test('preserves distinct model identifier', () {
+      const def = OmlxModelDefinition(
+        name: 'qwen',
+        model: 'mlx-community/Qwen2.5-7B-Instruct-4bit',
+        supportsTools: false,
+        supportsConstrainedOutput: false,
+      );
+      expect(def.name, equals('qwen'));
+      expect(def.model, equals('mlx-community/Qwen2.5-7B-Instruct-4bit'));
+      expect(def.supportsTools, isFalse);
+      expect(def.supportsConstrainedOutput, isFalse);
+    });
+  });
+
+  group('OmlxEmbedderDefinition', () {
+    test('defaults model to name', () {
+      const def = OmlxEmbedderDefinition(name: 'bge-micro', dimensions: 384);
+      expect(def.name, equals('bge-micro'));
+      expect(def.model, equals('bge-micro'));
+      expect(def.dimensions, equals(384));
+    });
+  });
+}

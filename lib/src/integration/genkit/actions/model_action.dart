@@ -1,0 +1,218 @@
+import 'dart:async';
+
+import 'package:domlx/domlx.dart' as omlx;
+import 'package:genkit/plugin.dart' as genkit;
+
+import '../../../api/generation_config.dart';
+import '../../../api/model_definition.dart';
+import '../../../core/client/omlx_client_manager.dart';
+import '../action_support.dart';
+import '../converters/genkit_to_omlx.dart';
+import '../converters/omlx_to_genkit.dart';
+
+typedef _ModelActionContext =
+    genkit.ActionFnArg<genkit.ModelResponseChunk, genkit.ModelRequest, void>;
+
+/// Builds a Genkit [genkit.Model] action for an [OmlxModelDefinition].
+genkit.Model<OmlxGenerationConfig> buildModelAction({
+  required OmlxModelDefinition definition,
+  required OmlxClientManager clientManager,
+}) {
+  final modelInfo = modelInfoFor(definition);
+  final actionName = actionNameFor(definition.name);
+
+  return genkit.Model<OmlxGenerationConfig>(
+    name: actionName,
+    metadata: actionMetadataForModel(definition, modelInfo: modelInfo),
+    fn: (request, context) {
+      if (request == null) {
+        throw genkit.GenkitException(
+          'Model request cannot be null.',
+          status: genkit.StatusCodes.INVALID_ARGUMENT,
+        );
+      }
+
+      return _runModel(
+        definition: definition,
+        clientManager: clientManager,
+        request: request,
+        context: context,
+      );
+    },
+  );
+}
+
+Future<genkit.ModelResponse> _runModel({
+  required OmlxModelDefinition definition,
+  required OmlxClientManager clientManager,
+  required genkit.ModelRequest request,
+  required _ModelActionContext context,
+}) async {
+  if (request.docs != null && request.docs!.isNotEmpty) {
+    throw genkit.GenkitException(
+      'oMLX model actions do not support `docs` yet.',
+      status: genkit.StatusCodes.INVALID_ARGUMENT,
+    );
+  }
+
+  final hasTools = request.tools?.isNotEmpty ?? false;
+  if (hasTools && !definition.supportsTools) {
+    throw genkit.GenkitException(
+      'Tool use is disabled for `${definition.name}`.',
+      status: genkit.StatusCodes.FAILED_PRECONDITION,
+    );
+  }
+
+  if (shouldUseStructuredGeneration(request.output) &&
+      !definition.supportsConstrainedOutput) {
+    throw genkit.GenkitException(
+      'Constrained output is disabled for `${definition.name}`.',
+      status: genkit.StatusCodes.FAILED_PRECONDITION,
+    );
+  }
+
+  final config = OmlxGenerationConfig.fromJson(request.config);
+  final messages = toOmlxMessages(request.messages);
+  final tools = toOmlxTools(request.tools);
+  final toolChoice = toOmlxToolChoice(
+    request.toolChoice,
+    hasTools: tools != null && tools.isNotEmpty,
+  );
+  final responseFormat = toOmlxResponseFormat(request.output);
+
+  final chatRequest = omlx.ChatCompletionRequest(
+    model: definition.model,
+    messages: messages,
+    temperature: config.temperature,
+    topP: config.topP,
+    topK: config.topK,
+    repetitionPenalty: config.repetitionPenalty,
+    maxTokens: config.maxTokens,
+    stream: context.streamingRequested,
+    tools: tools,
+    toolChoice: toolChoice,
+    responseFormat: responseFormat,
+    stop: config.stop,
+    user: config.user,
+    extra: config.extra ?? const {},
+  );
+
+  final started = Stopwatch()..start();
+
+  if (context.streamingRequested) {
+    return _runStreamingModel(
+      definition: definition,
+      clientManager: clientManager,
+      chatRequest: chatRequest,
+      responseFormat: responseFormat,
+      context: context,
+      started: started,
+    );
+  }
+
+  final completion = await clientManager.client.chat.create(chatRequest);
+  return toGenkitModelResponse(
+    completion,
+    latencyMs: started.elapsedMilliseconds.toDouble(),
+    raw: rawResponseMetadata(definition, structured: responseFormat != null),
+  );
+}
+
+Future<genkit.ModelResponse> _runStreamingModel({
+  required OmlxModelDefinition definition,
+  required OmlxClientManager clientManager,
+  required omlx.ChatCompletionRequest chatRequest,
+  required omlx.ResponseFormat? responseFormat,
+  required _ModelActionContext context,
+  required Stopwatch started,
+}) async {
+  final textBuffer = StringBuffer();
+  final reasoningBuffer = StringBuffer();
+  final toolCallsMap = <String, _ToolCallAccumulator>{};
+  String? finishReason;
+  omlx.Usage? usage;
+
+  final stream = clientManager.client.chat.createStream(chatRequest);
+
+  await for (final chunk in stream) {
+    if (chunk.usage != null) {
+      usage = chunk.usage;
+    }
+
+    if (chunk.choices.isNotEmpty) {
+      final choice = chunk.choices.first;
+      if (choice.finishReason != null) {
+        finishReason = choice.finishReason;
+      }
+
+      final delta = choice.delta;
+      if (delta.content != null && delta.content!.isNotEmpty) {
+        textBuffer.write(delta.content);
+      }
+      if (delta.reasoningContent != null &&
+          delta.reasoningContent!.isNotEmpty) {
+        reasoningBuffer.write(delta.reasoningContent);
+      }
+
+      if (delta.toolCalls != null) {
+        for (final tc in delta.toolCalls!) {
+          final id = tc.id.isNotEmpty ? tc.id : 'call_${toolCallsMap.length}';
+          final acc = toolCallsMap.putIfAbsent(
+            id,
+            () => _ToolCallAccumulator(id: id, name: tc.function.name),
+          );
+          if (tc.function.name.isNotEmpty) {
+            acc.name = tc.function.name;
+          }
+          acc.argumentsBuffer.write(tc.function.arguments);
+        }
+      }
+    }
+
+    final genkitChunk = toGenkitChunk(chunk);
+    if (genkitChunk != null) {
+      context.sendChunk(genkitChunk);
+    }
+  }
+
+  final parts = <genkit.Part>[];
+  final reasoning = reasoningBuffer.toString();
+  if (reasoning.isNotEmpty) {
+    parts.add(genkit.ReasoningPart(reasoning: reasoning));
+  }
+
+  final text = textBuffer.toString();
+  if (text.isNotEmpty || (toolCallsMap.isEmpty && parts.isEmpty)) {
+    parts.add(genkit.TextPart(text: text));
+  }
+
+  for (final acc in toolCallsMap.values) {
+    parts.add(
+      toGenkitToolRequestPart(
+        omlx.ToolCall(
+          id: acc.id,
+          function: omlx.FunctionCall(
+            name: acc.name,
+            arguments: acc.argumentsBuffer.toString(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  return genkit.ModelResponse(
+    message: genkit.Message(role: genkit.Role.model, content: parts),
+    finishReason: mapFinishReason(finishReason),
+    usage: toGenkitUsage(usage),
+    latencyMs: started.elapsedMilliseconds.toDouble(),
+    raw: rawResponseMetadata(definition, structured: responseFormat != null),
+  );
+}
+
+class _ToolCallAccumulator {
+  _ToolCallAccumulator({required this.id, required this.name});
+
+  final String id;
+  String name;
+  final StringBuffer argumentsBuffer = StringBuffer();
+}
