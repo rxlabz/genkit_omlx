@@ -72,12 +72,14 @@ Map<String, dynamic> actionMetadataForEmbedder(
 Map<String, dynamic> rawResponseMetadata(
   OmlxModelDefinition definition, {
   bool structured = false,
+  Map<String, dynamic>? rawResponse,
   Map<String, dynamic>? extra,
 }) {
   return <String, dynamic>{
     'provider': omlxPluginName,
     'model': definition.model,
     if (structured) 'structured': true,
+    ...?rawResponse,
     ...?extra,
   };
 }

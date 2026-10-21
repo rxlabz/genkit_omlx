@@ -309,5 +309,239 @@ void main() {
         equals('string'),
       );
     });
+
+    test('accumulates fragmented streaming tool calls across chunks', () async {
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/v1/chat/completions') {
+          final sseData = [
+            r'data: {"id":"c1","created":123456,"model":"qwen","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"call_w1","type":"function","function":{"name":"get_weather","arguments":"{\"city\":"}}]},"finish_reason":null}]}'
+                '\n\n',
+            r'data: {"id":"c1","created":123456,"model":"qwen","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"Paris\"}"}}]},"finish_reason":null}]}'
+                '\n\n',
+            'data: {"id":"c1","created":123456,"model":"qwen","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":10,"completion_tokens":12,"total_tokens":22}}\n\n',
+            'data: [DONE]\n\n',
+          ].join();
+
+          return http.Response(
+            sseData,
+            200,
+            headers: {'content-type': 'text/event-stream'},
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final plugin = omlx(
+        httpClient: mockClient,
+        models: const [OmlxModelDefinition(name: 'qwen')],
+      );
+
+      final ai = Genkit(plugins: [plugin]);
+      final stream = ai.generateStream(
+        model: omlx.model('qwen'),
+        prompt: 'Weather in Paris?',
+        returnToolRequests: true,
+      );
+
+      final receivedChunks = <GenerateResponseChunk>[];
+      await for (final chunk in stream) {
+        receivedChunks.add(chunk);
+      }
+
+      // Tool call parts should NOT be emitted in streaming chunks
+      for (final chunk in receivedChunks) {
+        expect(chunk.content.any((p) => p.isToolRequest), isFalse);
+      }
+
+      final finalResponse = await stream.onResult;
+      expect(finalResponse.finishReason, equals(FinishReason.stop));
+      expect(finalResponse.toolRequests.length, equals(1));
+      expect(finalResponse.toolRequests[0].ref, equals('call_w1'));
+      expect(finalResponse.toolRequests[0].name, equals('get_weather'));
+      expect(finalResponse.toolRequests[0].input, equals({'city': 'Paris'}));
+    });
+
+    test('maps HTTP 507 to GenkitException resourceExhausted on non-streaming', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'error': {
+              'message': 'Unified Memory allocation failed for model weights',
+              'type': 'out_of_memory_error',
+              'code': 507,
+            },
+          }),
+          507,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final plugin = omlx(
+        httpClient: mockClient,
+        models: const [OmlxModelDefinition(name: 'qwen')],
+      );
+
+      await plugin.init();
+      final model = plugin.resolve(ActionType.model, 'qwen') as Model;
+
+      expect(
+        () => model(
+          ModelRequest(
+            messages: [
+              Message(role: Role.user, content: [TextPart(text: 'Hello')]),
+            ],
+          ),
+        ),
+        throwsA(
+          isA<GenkitException>().having(
+            (e) => e.status,
+            'status',
+            equals(StatusCode.resourceExhausted),
+          ),
+        ),
+      );
+
+      // Verify ai.generate surfaces the mapped status on the failed response
+      final ai = Genkit(plugins: [plugin]);
+      final result = await ai.generate(
+        model: omlx.model('qwen'),
+        prompt: 'Hello',
+      );
+      expect(result.finishReason, equals(FinishReason.failed));
+      expect(
+        result.cause,
+        isA<GenkitException>().having(
+          (e) => e.status,
+          'status',
+          equals(StatusCode.resourceExhausted),
+        ),
+      );
+    });
+
+    test('maps HTTP 409 to GenkitException aborted on streaming', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'error': {
+              'message': 'Model swap conflict',
+              'type': 'conflict',
+              'code': 409,
+            },
+          }),
+          409,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final plugin = omlx(
+        httpClient: mockClient,
+        models: const [OmlxModelDefinition(name: 'qwen')],
+      );
+
+      await plugin.init();
+      final model = plugin.resolve(ActionType.model, 'qwen') as Model;
+
+      expect(
+        () => model(
+          ModelRequest(
+            messages: [
+              Message(role: Role.user, content: [TextPart(text: 'Hello')]),
+            ],
+          ),
+          onChunk: (_) {},
+        ),
+        throwsA(
+          isA<GenkitException>().having(
+            (e) => e.status,
+            'status',
+            equals(StatusCode.aborted),
+          ),
+        ),
+      );
+    });
+
+    test('overrides wire model name using version config', () async {
+      late String capturedBody;
+
+      final mockClient = MockClient((request) async {
+        capturedBody = request.body;
+        final responsePayload = {
+          'id': 'chatcmpl-v1',
+          'object': 'chat.completion',
+          'created': 123456789,
+          'model': 'qwen2.5-coder-32b-instruct-4bit',
+          'choices': [
+            {
+              'index': 0,
+              'message': {'role': 'assistant', 'content': 'Done'},
+              'finish_reason': 'stop',
+            },
+          ],
+        };
+        return http.Response(
+          jsonEncode(responsePayload),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final plugin = omlx(
+        httpClient: mockClient,
+        models: const [OmlxModelDefinition(name: 'qwen')],
+      );
+
+      final ai = Genkit(plugins: [plugin]);
+      await ai.generate(
+        model: omlx.model('qwen'),
+        prompt: 'Hi',
+        config: OmlxGenerationConfig(
+          version: 'qwen2.5-coder-32b-instruct-4bit',
+        ),
+      );
+
+      final decoded = jsonDecode(capturedBody) as Map<String, dynamic>;
+      expect(decoded['model'], equals('qwen2.5-coder-32b-instruct-4bit'));
+    });
+
+    test('preserves raw completion payload in ModelResponse.raw', () async {
+      final mockClient = MockClient((request) async {
+        final responsePayload = {
+          'id': 'chatcmpl-raw-test',
+          'object': 'chat.completion',
+          'created': 123456789,
+          'model': 'qwen',
+          'choices': [
+            {
+              'index': 0,
+              'message': {'role': 'assistant', 'content': 'Hello'},
+              'finish_reason': 'stop',
+            },
+          ],
+        };
+        return http.Response(
+          jsonEncode(responsePayload),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final plugin = omlx(
+        httpClient: mockClient,
+        models: const [OmlxModelDefinition(name: 'qwen')],
+      );
+
+      final ai = Genkit(plugins: [plugin]);
+      final response = await ai.generate(
+        model: omlx.model('qwen'),
+        prompt: 'Hi',
+      );
+
+      expect(response.raw, isNotNull);
+      final rawMap = response.raw as Map<String, dynamic>;
+      expect(rawMap['id'], equals('chatcmpl-raw-test'));
+      expect(rawMap['object'], equals('chat.completion'));
+      expect(rawMap['provider'], equals('omlx'));
+      expect(rawMap['choices'], isList);
+    });
   });
 }

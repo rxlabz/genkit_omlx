@@ -27,6 +27,7 @@ base class OmlxGenerationConfig {
   OmlxGenerationConfig._(this._json);
 
   OmlxGenerationConfig({
+    String? version,
     double? temperature,
     double? topP,
     int? topK,
@@ -34,9 +35,12 @@ base class OmlxGenerationConfig {
     int? maxTokens,
     List<String>? stop,
     String? user,
+    bool? jsonMode,
+    bool? strictJsonSchema,
     Map<String, dynamic>? extra,
   }) {
     _json = {
+      'version': ?version,
       'temperature': ?temperature,
       'topP': ?topP,
       'topK': ?topK,
@@ -44,6 +48,8 @@ base class OmlxGenerationConfig {
       'maxTokens': ?maxTokens,
       'stop': ?stop,
       'user': ?user,
+      'jsonMode': ?jsonMode,
+      'strictJsonSchema': ?strictJsonSchema,
       'extra': ?extra,
     };
   }
@@ -53,6 +59,20 @@ base class OmlxGenerationConfig {
   /// The JSON schema and type descriptor for [OmlxGenerationConfig].
   static const SchemanticType<OmlxGenerationConfig> $schema =
       _OmlxGenerationConfigTypeFactory();
+
+  /// Model identifier or quantization override (e.g. 'mlx-community/Qwen2.5-7B-Instruct-8bit').
+  String? get version {
+    return _json['version'] as String?;
+  }
+
+  /// Model identifier or quantization override (e.g. 'mlx-community/Qwen2.5-7B-Instruct-8bit').
+  set version(String? value) {
+    if (value == null) {
+      _json.remove('version');
+    } else {
+      _json['version'] = value;
+    }
+  }
 
   /// Sampling temperature (0.0 - 2.0).
   double? get temperature {
@@ -152,6 +172,34 @@ base class OmlxGenerationConfig {
     }
   }
 
+  /// Forces `{"type": "json_object"}` response format when output config is unconstrained.
+  bool? get jsonMode {
+    return _json['jsonMode'] as bool?;
+  }
+
+  /// Forces `{"type": "json_object"}` response format when output config is unconstrained.
+  set jsonMode(bool? value) {
+    if (value == null) {
+      _json.remove('jsonMode');
+    } else {
+      _json['jsonMode'] = value;
+    }
+  }
+
+  /// Whether to enforce strict JSON Schema validation (defaults to false).
+  bool? get strictJsonSchema {
+    return _json['strictJsonSchema'] as bool?;
+  }
+
+  /// Whether to enforce strict JSON Schema validation (defaults to false).
+  set strictJsonSchema(bool? value) {
+    if (value == null) {
+      _json.remove('strictJsonSchema');
+    } else {
+      _json['strictJsonSchema'] = value;
+    }
+  }
+
   /// Additional custom or vendor-specific oMLX parameters.
   Map<String, dynamic>? get extra {
     return (_json['extra'] as Map?)?.cast<String, dynamic>();
@@ -193,6 +241,7 @@ base class _OmlxGenerationConfigTypeFactory
       'type': 'object',
       'description': 'Request-time generation options for oMLX models.',
       'properties': <String, Object?>{
+        'version': <String, Object?>{'type': 'string'},
         'temperature': <String, Object?>{
           'type': 'number',
           'minimum': 0.0,
@@ -214,6 +263,8 @@ base class _OmlxGenerationConfigTypeFactory
           'items': <String, Object?>{'type': 'string'},
         },
         'user': <String, Object?>{'type': 'string'},
+        'jsonMode': <String, Object?>{'type': 'boolean'},
+        'strictJsonSchema': <String, Object?>{'type': 'boolean'},
         'extra': <String, Object?>{
           'type': 'object',
           'additionalProperties': <String, Object?>{},

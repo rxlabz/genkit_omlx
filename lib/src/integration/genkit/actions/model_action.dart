@@ -9,6 +9,7 @@ import '../../../core/client/omlx_client_manager.dart';
 import '../action_support.dart';
 import '../converters/genkit_to_omlx.dart';
 import '../converters/omlx_to_genkit.dart';
+import '../error_mapping.dart';
 
 typedef _ModelActionContext =
     genkit.ActionFnArg<genkit.ModelResponseChunk, genkit.ModelRequest, void>;
@@ -66,16 +67,21 @@ Future<genkit.ModelResponse> _runModel({
   }
 
   final config = parseOmlxGenerationConfig(request.config);
+  final wireModel = config.version ?? definition.model;
   final messages = toOmlxMessages(request.messages);
   final tools = toOmlxTools(request.tools);
   final toolChoice = toOmlxToolChoice(
     request.toolChoice,
     hasTools: tools != null && tools.isNotEmpty,
   );
-  final responseFormat = toOmlxResponseFormat(request.output);
+  final responseFormat = toOmlxResponseFormat(
+    request.output,
+    jsonMode: config.jsonMode,
+    strict: config.strictJsonSchema,
+  );
 
   final chatRequest = omlx.ChatCompletionRequest(
-    model: definition.model,
+    model: wireModel,
     messages: messages,
     temperature: config.temperature,
     topP: config.topP,
@@ -104,12 +110,20 @@ Future<genkit.ModelResponse> _runModel({
     );
   }
 
-  final completion = await clientManager.client.chat.create(chatRequest);
-  return toGenkitModelResponse(
-    completion,
-    latencyMs: started.elapsedMilliseconds.toDouble(),
-    raw: rawResponseMetadata(definition, structured: responseFormat != null),
-  );
+  try {
+    final completion = await clientManager.client.chat.create(chatRequest);
+    return toGenkitModelResponse(
+      completion,
+      latencyMs: started.elapsedMilliseconds.toDouble(),
+      raw: rawResponseMetadata(
+        definition,
+        structured: responseFormat != null,
+        rawResponse: completion.toJson(),
+      ),
+    );
+  } catch (e, stackTrace) {
+    Error.throwWithStackTrace(toGenkitException(e, stackTrace), stackTrace);
+  }
 }
 
 Future<genkit.ModelResponse> _runStreamingModel({
@@ -122,53 +136,62 @@ Future<genkit.ModelResponse> _runStreamingModel({
 }) async {
   final textBuffer = StringBuffer();
   final reasoningBuffer = StringBuffer();
-  final toolCallsMap = <String, _ToolCallAccumulator>{};
+  final toolCallsByIndex = <int, _ToolCallAccumulator>{};
   String? finishReason;
   omlx.Usage? usage;
 
-  final stream = clientManager.client.chat.createStream(chatRequest);
+  try {
+    final stream = clientManager.client.chat.createStream(chatRequest);
 
-  await for (final chunk in stream) {
-    if (chunk.usage != null) {
-      usage = chunk.usage;
-    }
-
-    if (chunk.choices.isNotEmpty) {
-      final choice = chunk.choices.first;
-      if (choice.finishReason != null) {
-        finishReason = choice.finishReason;
+    await for (final chunk in stream) {
+      if (chunk.usage != null) {
+        usage = chunk.usage;
       }
 
-      final delta = choice.delta;
-      if (delta.content != null && delta.content!.isNotEmpty) {
-        textBuffer.write(delta.content);
-      }
-      if (delta.reasoningContent != null &&
-          delta.reasoningContent!.isNotEmpty) {
-        reasoningBuffer.write(delta.reasoningContent);
-      }
+      if (chunk.choices.isNotEmpty) {
+        final choice = chunk.choices.first;
+        if (choice.finishReason != null) {
+          finishReason = choice.finishReason;
+        }
 
-      if (delta.toolCalls != null) {
-        for (final tc in delta.toolCalls!) {
-          final id = tc.id?.isNotEmpty == true
-              ? tc.id!
-              : 'call_${toolCallsMap.length}';
-          final acc = toolCallsMap.putIfAbsent(
-            id,
-            () => _ToolCallAccumulator(id: id, name: tc.function.name),
-          );
-          if (tc.function.name.isNotEmpty) {
-            acc.name = tc.function.name;
+        final delta = choice.delta;
+        if (delta.content != null && delta.content!.isNotEmpty) {
+          textBuffer.write(delta.content);
+        }
+        if (delta.reasoningContent != null &&
+            delta.reasoningContent!.isNotEmpty) {
+          reasoningBuffer.write(delta.reasoningContent);
+        }
+
+        if (delta.toolCalls != null) {
+          for (var i = 0; i < delta.toolCalls!.length; i++) {
+            final tc = delta.toolCalls![i];
+            final callIndex = tc.index ?? toolCallsByIndex.length;
+            final acc = toolCallsByIndex.putIfAbsent(
+              callIndex,
+              () => _ToolCallAccumulator(
+                id: tc.id?.isNotEmpty == true ? tc.id! : 'call_$callIndex',
+                name: tc.function.name,
+              ),
+            );
+            if (tc.id?.isNotEmpty == true) {
+              acc.id = tc.id!;
+            }
+            if (tc.function.name.isNotEmpty) {
+              acc.name = tc.function.name;
+            }
+            acc.argumentsBuffer.write(tc.function.arguments);
           }
-          acc.argumentsBuffer.write(tc.function.arguments);
         }
       }
-    }
 
-    final genkitChunk = toGenkitChunk(chunk);
-    if (genkitChunk != null) {
-      context.sendChunk(genkitChunk);
+      final genkitChunk = toGenkitChunk(chunk);
+      if (genkitChunk != null) {
+        context.sendChunk(genkitChunk);
+      }
     }
+  } catch (e, stackTrace) {
+    Error.throwWithStackTrace(toGenkitException(e, stackTrace), stackTrace);
   }
 
   final parts = <genkit.Part>[];
@@ -178,11 +201,11 @@ Future<genkit.ModelResponse> _runStreamingModel({
   }
 
   final text = textBuffer.toString();
-  if (text.isNotEmpty || (toolCallsMap.isEmpty && parts.isEmpty)) {
+  if (text.isNotEmpty || (toolCallsByIndex.isEmpty && parts.isEmpty)) {
     parts.add(genkit.TextPart(text: text));
   }
 
-  for (final acc in toolCallsMap.values) {
+  for (final acc in toolCallsByIndex.values) {
     parts.add(
       toGenkitToolRequestPart(
         omlx.ToolCall(
@@ -201,14 +224,21 @@ Future<genkit.ModelResponse> _runStreamingModel({
     finishReason: mapFinishReason(finishReason),
     usage: toGenkitUsage(usage),
     latencyMs: started.elapsedMilliseconds.toDouble(),
-    raw: rawResponseMetadata(definition, structured: responseFormat != null),
+    raw: rawResponseMetadata(
+      definition,
+      structured: responseFormat != null,
+      rawResponse: {
+        'finish_reason': ?finishReason,
+        'usage': ?usage?.toJson(),
+      },
+    ),
   );
 }
 
 class _ToolCallAccumulator {
   _ToolCallAccumulator({required this.id, required this.name});
 
-  final String id;
+  String id;
   String name;
   final StringBuffer argumentsBuffer = StringBuffer();
 }

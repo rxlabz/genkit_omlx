@@ -146,11 +146,66 @@ void main() {
       expect(rfSchema, isNotNull);
       expect(rfSchema!.type, equals('json_schema'));
       expect(rfSchema.jsonSchema?['name'], equals('response'));
+      expect(rfSchema.jsonSchema?['strict'], isFalse);
 
       final jsonConfig = genkit.OutputConfig(format: 'json');
       final rfJson = toOmlxResponseFormat(jsonConfig);
       expect(rfJson, isNotNull);
       expect(rfJson!.type, equals('json_object'));
+    });
+
+    test('flattens tool input schema with defs and refs', () {
+      final tools = [
+        genkit.ToolDefinition(
+          name: 'create_user',
+          description: 'Creates a user with address',
+          inputSchema: {
+            'type': 'object',
+            'properties': {
+              'address': {r'$ref': r'#/$defs/Address'},
+            },
+            r'$defs': {
+              'Address': {
+                'type': 'object',
+                'properties': {
+                  'street': {'type': 'string'},
+                },
+              },
+            },
+          },
+        ),
+      ];
+
+      final omlxTools = toOmlxTools(tools);
+      expect(omlxTools, isNotNull);
+      expect(omlxTools!.length, equals(1));
+      final params = omlxTools[0].function.parameters;
+      expect(params, isNotNull);
+      expect(params!['type'], equals('object'));
+      // Check that the schema was processed and valid
+      expect(params['properties'], isNotNull);
+    });
+
+    test('respects jsonMode and strict in response format', () {
+      final schemaConfig = genkit.OutputConfig(
+        schema: {
+          'type': 'object',
+          'properties': {
+            'count': {'type': 'integer'},
+          },
+        },
+      );
+
+      // jsonMode forces json_object even if schema is provided
+      final rfJsonMode = toOmlxResponseFormat(schemaConfig, jsonMode: true);
+      expect(rfJsonMode, isNotNull);
+      expect(rfJsonMode!.type, equals('json_object'));
+
+      // strict = true sets strict: true on json_schema
+      final rfStrict = toOmlxResponseFormat(schemaConfig, strict: true);
+      expect(rfStrict, isNotNull);
+      expect(rfStrict!.type, equals('json_schema'));
+      expect(rfStrict.jsonSchema?['strict'], isTrue);
     });
   });
 

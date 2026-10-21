@@ -46,6 +46,11 @@ genkit.ModelResponse toGenkitModelResponse(
 }
 
 /// Converts an oMLX [omlx.ChatCompletionChunk] into a Genkit [genkit.ModelResponseChunk].
+///
+/// Note: Streaming chunks only emit [genkit.ReasoningPart] and [genkit.TextPart]
+/// deltas. Tool call deltas arrive across multiple chunks as partial fragments
+/// and are accumulated in the action runner, then emitted complete on the final
+/// [genkit.ModelResponse].
 genkit.ModelResponseChunk? toGenkitChunk(omlx.ChatCompletionChunk chunk) {
   if (chunk.choices.isEmpty) {
     return null;
@@ -61,12 +66,6 @@ genkit.ModelResponseChunk? toGenkitChunk(omlx.ChatCompletionChunk chunk) {
 
   if (delta.content != null && delta.content!.isNotEmpty) {
     parts.add(genkit.TextPart(text: delta.content!));
-  }
-
-  if (delta.toolCalls != null) {
-    for (final toolCall in delta.toolCalls!) {
-      parts.add(toGenkitToolRequestPart(toolCall));
-    }
   }
 
   if (parts.isEmpty) {

@@ -17,6 +17,9 @@ part 'generation_config.g.dart';
 /// ```
 @Schema(description: 'Request-time generation options for oMLX models.')
 abstract class $OmlxGenerationConfig {
+  /// Model identifier or quantization override (e.g. 'mlx-community/Qwen2.5-7B-Instruct-8bit').
+  String? get version;
+
   /// Sampling temperature (0.0 - 2.0).
   @DoubleField(minimum: 0.0, maximum: 2.0)
   double? get temperature;
@@ -43,6 +46,12 @@ abstract class $OmlxGenerationConfig {
   /// Optional end-user identifier for request tracking.
   String? get user;
 
+  /// Forces `{"type": "json_object"}` response format when output config is unconstrained.
+  bool? get jsonMode;
+
+  /// Whether to enforce strict JSON Schema validation (defaults to false).
+  bool? get strictJsonSchema;
+
   /// Additional custom or vendor-specific oMLX parameters.
   Map<String, dynamic>? get extra;
 }
@@ -61,6 +70,7 @@ OmlxGenerationConfig parseOmlxGenerationConfig(Map<String, dynamic>? config) {
 /// Normalizes options for [OmlxGenerationConfig], handling snake_case aliases and unmodeled extra keys.
 Map<String, dynamic> normalizeOmlxGenerationConfig(Map<String, dynamic> raw) {
   final knownKeys = {
+    'version',
     'temperature',
     'topP',
     'top_p',
@@ -73,6 +83,11 @@ Map<String, dynamic> normalizeOmlxGenerationConfig(Map<String, dynamic> raw) {
     'stop',
     'stopSequences',
     'user',
+    'jsonMode',
+    'json_mode',
+    'strictJsonSchema',
+    'strict_json_schema',
+    'strict',
     'extra',
   };
 
@@ -86,6 +101,10 @@ Map<String, dynamic> normalizeOmlxGenerationConfig(Map<String, dynamic> raw) {
       extraMap[entry.key] = entry.value;
       normalized[entry.key] = entry.value;
     }
+  }
+
+  if (raw.containsKey('version')) {
+    normalized['version'] = raw['version']?.toString();
   }
 
   if (raw.containsKey('temperature')) {
@@ -122,6 +141,17 @@ Map<String, dynamic> normalizeOmlxGenerationConfig(Map<String, dynamic> raw) {
 
   if (raw.containsKey('user')) {
     normalized['user'] = raw['user']?.toString();
+  }
+
+  final jsonModeVal = raw['jsonMode'] ?? raw['json_mode'];
+  if (jsonModeVal is bool) {
+    normalized['jsonMode'] = jsonModeVal;
+  }
+
+  final strictVal =
+      raw['strictJsonSchema'] ?? raw['strict_json_schema'] ?? raw['strict'];
+  if (strictVal is bool) {
+    normalized['strictJsonSchema'] = strictVal;
   }
 
   if (extraMap.isNotEmpty) {

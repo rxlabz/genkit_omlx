@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:domlx/domlx.dart' as omlx;
 import 'package:genkit/plugin.dart' as genkit;
+import 'package:schemantic/schemantic.dart';
 
 /// Converts Genkit messages to oMLX [omlx.ChatMessage] objects.
 List<omlx.ChatMessage> toOmlxMessages(List<genkit.Message> messages) {
@@ -115,13 +116,57 @@ List<omlx.Tool>? toOmlxTools(List<genkit.ToolDefinition>? tools) {
 
   return tools
       .map((tool) {
+        var parameters = _inlinedToolSchema(tool);
+
+        if (parameters == null) {
+          parameters = {'type': 'object', 'properties': <String, dynamic>{}};
+        } else if (!parameters.containsKey('type')) {
+          parameters = {'type': 'object', ...parameters};
+        } else if (parameters['type'] != 'object') {
+          throw genkit.GenkitException(
+            'oMLX requires tool parameters to be an object schema; tool '
+            '"${tool.name}" declares type "${parameters['type']}". '
+            'Wrap the input in an object schema.',
+            status: genkit.StatusCode.invalidArgument,
+          );
+        }
+
         return omlx.Tool.function(
           name: tool.name,
           description: tool.description,
-          parameters: tool.inputSchema,
+          parameters: parameters,
         );
       })
       .toList(growable: false);
+}
+
+Map<String, dynamic>? _inlinedToolSchema(genkit.ToolDefinition tool) {
+  final schema = tool.inputSchema;
+  if (schema == null) return null;
+  try {
+    return schema.flatten().cast<String, dynamic>();
+  } on FormatException {
+    return _withRootDefPromoted(schema);
+  }
+}
+
+Map<String, dynamic> _withRootDefPromoted(Map<String, dynamic> schema) {
+  final ref = schema[r'$ref'];
+  if (ref is! String) return schema;
+
+  final defsKey = schema.containsKey(r'$defs') ? r'$defs' : 'definitions';
+  final defs = schema[defsKey];
+  if (defs is! Map) return schema;
+
+  final root = defs[ref.split('/').last];
+  if (root is! Map) return schema;
+
+  final promoted = root.cast<String, dynamic>();
+  if (promoted.containsKey(r'$ref') || promoted['type'] != 'object') {
+    return schema;
+  }
+
+  return {...promoted, defsKey: defs.cast<String, dynamic>()};
 }
 
 /// Resolves tool choice configuration for oMLX.
@@ -138,20 +183,43 @@ dynamic toOmlxToolChoice(genkit.ToolChoice? toolChoice, {required bool hasTools}
 }
 
 /// Maps Genkit output configuration to an oMLX [omlx.ResponseFormat].
-omlx.ResponseFormat? toOmlxResponseFormat(genkit.OutputConfig? output) {
-  if (output == null) {
-    return null;
+omlx.ResponseFormat? toOmlxResponseFormat(
+  genkit.OutputConfig? output, {
+  bool? jsonMode,
+  bool? strict,
+}) {
+  if (output != null) {
+    final isJson = output.format == 'json' ||
+        output.contentType == 'application/json' ||
+        output.schema != null;
+
+    if (isJson) {
+      if (jsonMode == true) {
+        return omlx.ResponseFormat.jsonObject;
+      }
+      if (output.schema != null) {
+        Map<String, dynamic> flattenedSchema;
+        try {
+          flattenedSchema = output.schema!.flatten().cast<String, dynamic>();
+        } catch (_) {
+          flattenedSchema = output.schema!;
+        }
+
+        return omlx.ResponseFormat.jsonSchema(
+          name: 'response',
+          schema: flattenedSchema,
+          strict: strict ?? false,
+        );
+      }
+      return omlx.ResponseFormat.jsonObject;
+    }
+
+    if (output.format == 'text') {
+      return omlx.ResponseFormat.text;
+    }
   }
 
-  if (output.schema != null) {
-    return omlx.ResponseFormat.jsonSchema(
-      name: 'response',
-      schema: output.schema!,
-      strict: true,
-    );
-  }
-
-  if (output.format == 'json' || output.contentType == 'application/json') {
+  if (jsonMode == true) {
     return omlx.ResponseFormat.jsonObject;
   }
 
