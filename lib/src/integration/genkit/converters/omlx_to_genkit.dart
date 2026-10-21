@@ -88,7 +88,7 @@ genkit.ToolRequestPart toGenkitToolRequestPart(omlx.ToolCall toolCall) {
 
   return genkit.ToolRequestPart(
     toolRequest: genkit.ToolRequest(
-      ref: toolCall.id.isNotEmpty ? toolCall.id : 'call_0',
+      ref: toolCall.id?.isNotEmpty == true ? toolCall.id! : 'call_0',
       name: function.name,
       input: _decodeToolArguments(rawArgs),
     ),
@@ -126,10 +126,10 @@ genkit.GenerationUsage? toGenkitUsage(omlx.Usage? usage) {
   };
 
   return genkit.GenerationUsage(
-    inputTokens: usage.promptTokens.toDouble(),
-    outputTokens: usage.completionTokens.toDouble(),
-    totalTokens: usage.totalTokens.toDouble(),
-    cachedContentTokens: usage.cachedTokens?.toDouble(),
+    inputTokens: usage.promptTokens,
+    outputTokens: usage.completionTokens,
+    totalTokens: usage.totalTokens,
+    cachedContentTokens: usage.cachedTokens,
     custom: custom.isEmpty ? null : custom,
   );
 }

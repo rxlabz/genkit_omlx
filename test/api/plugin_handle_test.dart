@@ -22,20 +22,23 @@ void main() {
     test('creates typed model reference', () {
       final ref = omlx.model('qwen');
       expect(ref.name, equals('omlx/qwen'));
+      expect(ref.customOptions, isNotNull);
     });
 
     test('creates typed model reference with config', () {
       final ref = omlx.model(
         'qwen',
-        config: const OmlxGenerationConfig(temperature: 0.5),
+        config: OmlxGenerationConfig(temperature: 0.5),
       );
       expect(ref.name, equals('omlx/qwen'));
       expect(ref.config?.temperature, equals(0.5));
+      expect(ref.customOptions, isNotNull);
     });
 
     test('creates typed embedder reference', () {
       final ref = omlx.embedder('bge-micro');
       expect(ref.name, equals('omlx/bge-micro'));
+      expect(ref.customOptions, isNotNull);
     });
   });
 

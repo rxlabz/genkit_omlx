@@ -1,4 +1,6 @@
-import 'config_parsing.dart';
+import 'package:schemantic/schemantic.dart';
+
+part 'generation_config.g.dart';
 
 /// Request-time generation options supported by `genkit_omlx`.
 ///
@@ -6,104 +8,148 @@ import 'config_parsing.dart';
 /// final response = await ai.generate(
 ///   model: omlx.model('mlx-community/Qwen2.5-7B-Instruct-4bit'),
 ///   prompt: 'Summarize continuous batching.',
-///   config: const OmlxGenerationConfig(
+///   config: OmlxGenerationConfig(
 ///     temperature: 0.7,
 ///     topP: 0.9,
 ///     maxTokens: 512,
 ///   ),
 /// );
 /// ```
-class OmlxGenerationConfig {
-  /// Sampling temperature (default 1.0 in oMLX).
-  final double? temperature;
+@Schema(description: 'Request-time generation options for oMLX models.')
+abstract class $OmlxGenerationConfig {
+  /// Sampling temperature (0.0 - 2.0).
+  @DoubleField(minimum: 0.0, maximum: 2.0)
+  double? get temperature;
 
   /// Nucleus sampling probability cutoff (0.0 - 1.0).
-  final double? topP;
+  @DoubleField(minimum: 0.0, maximum: 1.0)
+  double? get topP;
 
   /// Top-K sampling cutoff.
-  final int? topK;
+  @IntegerField(minimum: 1)
+  int? get topK;
 
   /// Repetition penalty factor.
-  final double? repetitionPenalty;
+  @DoubleField(minimum: 0.0)
+  double? get repetitionPenalty;
 
   /// Maximum tokens to generate.
-  final int? maxTokens;
+  @IntegerField(minimum: 1)
+  int? get maxTokens;
 
   /// Stop sequences.
-  final List<String>? stop;
+  List<String>? get stop;
 
   /// Optional end-user identifier for request tracking.
-  final String? user;
+  String? get user;
 
   /// Additional custom or vendor-specific oMLX parameters.
-  final Map<String, dynamic>? extra;
+  Map<String, dynamic>? get extra;
+}
 
-  /// Creates a generation configuration.
-  const OmlxGenerationConfig({
-    this.temperature,
-    this.topP,
-    this.topK,
-    this.repetitionPenalty,
-    this.maxTokens,
-    this.stop,
-    this.user,
-    this.extra,
-  });
+/// Returns the Schemantic type descriptor for [OmlxGenerationConfig].
+SchemanticType<OmlxGenerationConfig> omlxGenerationConfigSchema() =>
+    const _NormalizedOmlxGenerationConfigSchema();
 
-  /// Builds a config instance from a Genkit options map.
-  factory OmlxGenerationConfig.fromJson(Map<String, dynamic>? json) {
-    if (json == null) {
-      return const OmlxGenerationConfig();
+/// Parses [OmlxGenerationConfig] from an action options map.
+OmlxGenerationConfig parseOmlxGenerationConfig(Map<String, dynamic>? config) {
+  if (config == null) return OmlxGenerationConfig();
+  final normalized = normalizeOmlxGenerationConfig(config);
+  return OmlxGenerationConfig.$schema.parse(normalized);
+}
+
+/// Normalizes options for [OmlxGenerationConfig], handling snake_case aliases and unmodeled extra keys.
+Map<String, dynamic> normalizeOmlxGenerationConfig(Map<String, dynamic> raw) {
+  final knownKeys = {
+    'temperature',
+    'topP',
+    'top_p',
+    'topK',
+    'top_k',
+    'repetitionPenalty',
+    'repetition_penalty',
+    'maxTokens',
+    'max_tokens',
+    'stop',
+    'stopSequences',
+    'user',
+    'extra',
+  };
+
+  final normalized = <String, dynamic>{};
+  final extraMap = <String, dynamic>{
+    if (raw['extra'] is Map) ...(raw['extra'] as Map).cast<String, dynamic>(),
+  };
+
+  for (final entry in raw.entries) {
+    if (!knownKeys.contains(entry.key)) {
+      extraMap[entry.key] = entry.value;
+      normalized[entry.key] = entry.value;
     }
+  }
 
-    final knownKeys = {
-      'temperature',
-      'topP',
-      'top_p',
-      'topK',
-      'top_k',
-      'repetitionPenalty',
-      'repetition_penalty',
-      'maxTokens',
-      'max_tokens',
-      'stop',
-      'stopSequences',
-      'user',
-      'extra',
-    };
+  if (raw.containsKey('temperature')) {
+    final temp = raw['temperature'];
+    if (temp is num) normalized['temperature'] = temp.toDouble();
+  }
 
-    final extraMap = <String, dynamic>{
-      if (json['extra'] is Map)
-        ...(json['extra'] as Map).cast<String, dynamic>(),
-      for (final entry in json.entries)
-        if (!knownKeys.contains(entry.key)) entry.key: entry.value,
-    };
+  final topPVal = raw['topP'] ?? raw['top_p'];
+  if (topPVal is num) {
+    normalized['topP'] = topPVal.toDouble();
+  }
 
-    return OmlxGenerationConfig(
-      temperature: asDouble(json['temperature']),
-      topP: asDouble(json['topP'] ?? json['top_p']),
-      topK: asInt(json['topK'] ?? json['top_k']),
-      repetitionPenalty: asDouble(
-        json['repetitionPenalty'] ?? json['repetition_penalty'],
-      ),
-      maxTokens: asInt(json['maxTokens'] ?? json['max_tokens']),
-      stop: asStringList(json['stop'] ?? json['stopSequences']),
-      user: json['user'] as String?,
-      extra: extraMap.isEmpty ? null : extraMap,
+  final topKVal = raw['topK'] ?? raw['top_k'];
+  if (topKVal is num) {
+    normalized['topK'] = topKVal.toInt();
+  }
+
+  final repVal = raw['repetitionPenalty'] ?? raw['repetition_penalty'];
+  if (repVal is num) {
+    normalized['repetitionPenalty'] = repVal.toDouble();
+  }
+
+  final maxTokVal = raw['maxTokens'] ?? raw['max_tokens'];
+  if (maxTokVal is num) {
+    normalized['maxTokens'] = maxTokVal.toInt();
+  }
+
+  final stopVal = raw['stop'] ?? raw['stopSequences'];
+  if (stopVal is List) {
+    normalized['stop'] = stopVal.cast<String>();
+  } else if (stopVal is String) {
+    normalized['stop'] = [stopVal];
+  }
+
+  if (raw.containsKey('user')) {
+    normalized['user'] = raw['user']?.toString();
+  }
+
+  if (extraMap.isNotEmpty) {
+    normalized['extra'] = extraMap;
+  }
+
+  return normalized;
+}
+
+final class _NormalizedOmlxGenerationConfigSchema
+    extends SchemanticType<OmlxGenerationConfig> {
+  const _NormalizedOmlxGenerationConfigSchema();
+
+  @override
+  OmlxGenerationConfig parse(Object? json) {
+    if (json == null) return OmlxGenerationConfig();
+    if (json is! Map) return OmlxGenerationConfig();
+    final normalized = normalizeOmlxGenerationConfig(
+      json.cast<String, dynamic>(),
     );
+    return OmlxGenerationConfig.$schema.parse(normalized);
   }
 
-  /// Serializes the config to a map compatible with Genkit and oMLX.
-  Map<String, dynamic> toJson() {
-    return {
-      if (temperature != null) 'temperature': temperature,
-      if (topP != null) 'top_p': topP,
-      if (topK != null) 'top_k': topK,
-      if (repetitionPenalty != null) 'repetition_penalty': repetitionPenalty,
-      if (maxTokens != null) 'max_tokens': maxTokens,
-      if (stop != null) 'stop': stop,
-      if (user != null) 'user': user,
-      ...?extra,
-    };
-  }
+  @override
+  JsonSchemaMetadata? get schemaMetadata =>
+      OmlxGenerationConfig.$schema.schemaMetadata;
+
+  @override
+  Map<String, Object?> jsonSchema({bool useRefs = false}) =>
+      OmlxGenerationConfig.$schema.jsonSchema(useRefs: useRefs);
 }

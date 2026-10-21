@@ -35,7 +35,7 @@ void main() async {
     final response = await ai.generate(
       model: omlx.model('Qwen9'),
       prompt: 'Explain Apple Silicon unified memory in two concise sentences.',
-      config: const OmlxGenerationConfig(temperature: 0.7),
+      config: OmlxGenerationConfig(temperature: 0.7),
     );
     print(response.text);
     print('Tokens used: ${response.usage?.totalTokens}\n');

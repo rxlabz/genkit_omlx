@@ -36,9 +36,17 @@ library;
 export 'package:domlx/domlx.dart'
     show OmlxApiException, OmlxException, OmlxNetworkException;
 
-export 'src/api/embed_config.dart' show OmlxEmbedConfig;
+export 'src/api/embed_config.dart'
+    show
+        OmlxEmbedConfig,
+        omlxEmbedConfigSchema,
+        parseOmlxEmbedConfig;
 export 'src/api/embedder_definition.dart' show OmlxEmbedderDefinition;
-export 'src/api/generation_config.dart' show OmlxGenerationConfig;
+export 'src/api/generation_config.dart'
+    show
+        OmlxGenerationConfig,
+        omlxGenerationConfigSchema,
+        parseOmlxGenerationConfig;
 export 'src/api/model_definition.dart' show OmlxModelDefinition;
 export 'src/api/plugin_handle.dart' show OmlxPluginHandle, omlx;
 export 'src/integration/genkit/plugin.dart' show OmlxPlugin;

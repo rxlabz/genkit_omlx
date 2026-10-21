@@ -13,11 +13,10 @@ import 'actions/model_action.dart';
 class OmlxPlugin extends GenkitPlugin {
   /// Creates an oMLX Genkit plugin.
   OmlxPlugin({
-    required OmlxClientManager clientManager,
+    required this.clientManager,
     List<OmlxModelDefinition>? models,
     List<OmlxEmbedderDefinition>? embedders,
-  }) : _clientManager = clientManager,
-       _models = List<OmlxModelDefinition>.unmodifiable(models ?? const []),
+  }) : _models = List<OmlxModelDefinition>.unmodifiable(models ?? const []),
        _embedders = List<OmlxEmbedderDefinition>.unmodifiable(
          embedders ?? const [],
        ) {
@@ -44,7 +43,8 @@ class OmlxPlugin extends GenkitPlugin {
     }
   }
 
-  final OmlxClientManager _clientManager;
+  /// The underlying client manager.
+  final OmlxClientManager clientManager;
   final List<OmlxModelDefinition> _models;
   final List<OmlxEmbedderDefinition> _embedders;
 
@@ -54,12 +54,9 @@ class OmlxPlugin extends GenkitPlugin {
   @override
   String get name => omlxPluginName;
 
-  /// The underlying client manager.
-  OmlxClientManager get clientManager => _clientManager;
-
   /// Disposes the plugin and closes any open HTTP connections.
   Future<void> dispose() async {
-    _clientManager.close();
+    clientManager.close();
   }
 
   @override
@@ -73,7 +70,7 @@ class OmlxPlugin extends GenkitPlugin {
     for (final def in _models) {
       final action = buildModelAction(
         definition: def,
-        clientManager: _clientManager,
+        clientManager: clientManager,
       );
       actions.add(action);
       _resolvedActions[actionNameFor(def.name)] = action;
@@ -83,7 +80,7 @@ class OmlxPlugin extends GenkitPlugin {
     for (final def in _embedders) {
       final action = buildEmbedderAction(
         definition: def,
-        clientManager: _clientManager,
+        clientManager: clientManager,
       );
       actions.add(action);
       _resolvedActions[actionNameFor(def.name)] = action;
@@ -115,7 +112,7 @@ class OmlxPlugin extends GenkitPlugin {
 
       final action = buildModelAction(
         definition: definition,
-        clientManager: _clientManager,
+        clientManager: clientManager,
       );
       _resolvedActions[name] = action;
       _resolvedActions[normalizedName] = action;
@@ -130,7 +127,7 @@ class OmlxPlugin extends GenkitPlugin {
 
       final action = buildEmbedderAction(
         definition: definition,
-        clientManager: _clientManager,
+        clientManager: clientManager,
       );
       _resolvedActions[name] = action;
       _resolvedActions[normalizedName] = action;
@@ -170,7 +167,7 @@ class OmlxPlugin extends GenkitPlugin {
 
     // Try to dynamically discover models currently known to oMLX server
     try {
-      final serverModels = await _clientManager.client.models.list();
+      final serverModels = await clientManager.client.models.list();
       for (final m in serverModels.data) {
         if (!knownModelNames.contains(m.id)) {
           final def = OmlxModelDefinition(name: m.id);

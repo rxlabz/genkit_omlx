@@ -1,6 +1,8 @@
 import 'package:genkit/plugin.dart' as genkit;
 
+import '../../api/embed_config.dart';
 import '../../api/embedder_definition.dart';
+import '../../api/generation_config.dart';
 import '../../api/model_definition.dart';
 
 /// Name of the oMLX Genkit plugin.
@@ -38,7 +40,10 @@ Map<String, dynamic> actionMetadataForModel(
   return <String, dynamic>{
     'label': info.label ?? 'oMLX - ${definition.name}',
     'description': definition.name,
-    'model': info.toJson(),
+    'model': <String, dynamic>{
+      ...info.toJson(),
+      'customOptions': omlxGenerationConfigSchema().jsonSchema(),
+    },
   };
 }
 
@@ -57,7 +62,8 @@ Map<String, dynamic> actionMetadataForEmbedder(
         'input': ['text'],
         ...?info?.supports,
       },
-      ...?info?.toJson(),
+      ...info?.toJson() ?? const <String, dynamic>{},
+      'customOptions': omlxEmbedConfigSchema().jsonSchema(),
     },
   };
 }

@@ -79,7 +79,11 @@ class OmlxPluginHandle {
     String name, {
     OmlxGenerationConfig? config,
   }) {
-    return modelRef<OmlxGenerationConfig>(actionNameFor(name), config: config);
+    return modelRef<OmlxGenerationConfig>(
+      actionNameFor(name),
+      config: config,
+      customOptions: omlxGenerationConfigSchema(),
+    );
   }
 
   /// Returns a typed Genkit embedder reference for [name].
@@ -87,6 +91,9 @@ class OmlxPluginHandle {
   /// The [name] can be either a declared [OmlxEmbedderDefinition.name] or any
   /// embedding model supported by the oMLX server.
   EmbedderRef<OmlxEmbedConfig> embedder(String name) {
-    return embedderRef<OmlxEmbedConfig>(actionNameFor(name));
+    return embedderRef<OmlxEmbedConfig>(
+      actionNameFor(name),
+      customOptions: omlxEmbedConfigSchema(),
+    );
   }
 }

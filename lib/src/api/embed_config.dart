@@ -1,4 +1,6 @@
-import 'config_parsing.dart';
+import 'package:schemantic/schemantic.dart';
+
+part 'embed_config.g.dart';
 
 /// Request-time embedding options supported by `genkit_omlx`.
 ///
@@ -8,43 +10,60 @@ import 'config_parsing.dart';
 ///   document: DocumentData(
 ///     content: <Part>[TextPart(text: 'Apple Silicon UMA')],
 ///   ),
-///   options: const OmlxEmbedConfig(dimensions: 384),
+///   options: OmlxEmbedConfig(dimensions: 384),
 /// );
 /// ```
-class OmlxEmbedConfig {
-  /// Optional dimension cutoff if supported by the model.
-  final int? dimensions;
+@Schema(description: 'Request-time embedding options for oMLX models.')
+abstract class $OmlxEmbedConfig {
+  /// Length of the returned vector.
+  @IntegerField(minimum: 1)
+  int? get dimensions;
 
   /// Optional encoding format: "float" (default) or "base64".
-  final String? encodingFormat;
+  @StringField(name: 'encoding_format', enumValues: ['float', 'base64'])
+  String? get encodingFormat;
 
-  /// Optional end-user identifier.
-  final String? user;
+  /// Optional end-user identifier for request tracking.
+  String? get user;
+}
 
-  /// Creates an embedding configuration.
-  const OmlxEmbedConfig({this.dimensions, this.encodingFormat, this.user});
+/// Returns the Schemantic type descriptor for [OmlxEmbedConfig].
+SchemanticType<OmlxEmbedConfig> omlxEmbedConfigSchema() =>
+    const _NormalizedOmlxEmbedConfigSchema();
 
-  /// Builds a config instance from a Genkit options map.
-  factory OmlxEmbedConfig.fromJson(Map<String, dynamic>? json) {
-    if (json == null) {
-      return const OmlxEmbedConfig();
-    }
+/// Parses [OmlxEmbedConfig] from an action options map.
+OmlxEmbedConfig parseOmlxEmbedConfig(Map<String, dynamic>? config) {
+  if (config == null) return OmlxEmbedConfig();
+  final normalized = normalizeOmlxEmbedConfig(config);
+  return OmlxEmbedConfig.$schema.parse(normalized);
+}
 
-    return OmlxEmbedConfig(
-      dimensions: asInt(json['dimensions']),
-      encodingFormat:
-          json['encodingFormat'] as String? ??
-          json['encoding_format'] as String?,
-      user: json['user'] as String?,
-    );
+/// Normalizes options for [OmlxEmbedConfig], handling snake_case aliases.
+Map<String, dynamic> normalizeOmlxEmbedConfig(Map<String, dynamic> raw) {
+  final normalized = Map<String, dynamic>.from(raw);
+  if (raw.containsKey('encodingFormat') && !raw.containsKey('encoding_format')) {
+    normalized['encoding_format'] = raw['encodingFormat'];
+  }
+  return normalized;
+}
+
+final class _NormalizedOmlxEmbedConfigSchema
+    extends SchemanticType<OmlxEmbedConfig> {
+  const _NormalizedOmlxEmbedConfigSchema();
+
+  @override
+  OmlxEmbedConfig parse(Object? json) {
+    if (json == null) return OmlxEmbedConfig();
+    if (json is! Map) return OmlxEmbedConfig();
+    final normalized = normalizeOmlxEmbedConfig(json.cast<String, dynamic>());
+    return OmlxEmbedConfig.$schema.parse(normalized);
   }
 
-  /// Serializes the config to a map.
-  Map<String, dynamic> toJson() {
-    return {
-      if (dimensions != null) 'dimensions': dimensions,
-      if (encodingFormat != null) 'encoding_format': encodingFormat,
-      if (user != null) 'user': user,
-    };
-  }
+  @override
+  JsonSchemaMetadata? get schemaMetadata =>
+      OmlxEmbedConfig.$schema.schemaMetadata;
+
+  @override
+  Map<String, Object?> jsonSchema({bool useRefs = false}) =>
+      OmlxEmbedConfig.$schema.jsonSchema(useRefs: useRefs);
 }

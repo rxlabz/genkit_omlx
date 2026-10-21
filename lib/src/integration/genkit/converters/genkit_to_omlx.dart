@@ -18,7 +18,7 @@ List<omlx.ChatMessage> toOmlxMessages(List<genkit.Message> messages) {
       if (toolResponses.isEmpty) {
         throw genkit.GenkitException(
           'Tool messages must contain at least one tool response part.',
-          status: genkit.StatusCodes.INVALID_ARGUMENT,
+          status: genkit.StatusCode.invalidArgument,
         );
       }
 
@@ -125,12 +125,12 @@ List<omlx.Tool>? toOmlxTools(List<genkit.ToolDefinition>? tools) {
 }
 
 /// Resolves tool choice configuration for oMLX.
-dynamic toOmlxToolChoice(String? toolChoice, {required bool hasTools}) {
+dynamic toOmlxToolChoice(genkit.ToolChoice? toolChoice, {required bool hasTools}) {
   if (!hasTools) {
     return null;
   }
 
-  return switch (toolChoice) {
+  return switch (toolChoice?.value) {
     'none' => 'none',
     'required' => 'required',
     _ => 'auto',
@@ -181,7 +181,7 @@ String documentToPlainText(genkit.DocumentData document) {
     } else {
       throw genkit.GenkitException(
         'oMLX embeddings only support text-only documents.',
-        status: genkit.StatusCodes.INVALID_ARGUMENT,
+        status: genkit.StatusCode.invalidArgument,
       );
     }
   }

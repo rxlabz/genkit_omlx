@@ -16,16 +16,10 @@ genkit.Embedder<OmlxEmbedConfig> buildEmbedderAction({
 
   return genkit.Embedder<OmlxEmbedConfig>(
     name: actionName,
+    customOptions: omlxEmbedConfigSchema(),
     metadata: actionMetadataForEmbedder(definition),
     fn: (request, _) async {
-      if (request == null) {
-        throw genkit.GenkitException(
-          'Embedder request cannot be null.',
-          status: genkit.StatusCodes.INVALID_ARGUMENT,
-        );
-      }
-
-      final config = OmlxEmbedConfig.fromJson(request.options);
+      final config = parseOmlxEmbedConfig(request.options);
       final texts = request.input
           .map(documentToPlainText)
           .toList(growable: false);

@@ -58,7 +58,7 @@ void main() {
       final response = await ai.generate(
         model: omlx.model('qwen'),
         prompt: 'Why Apple Silicon?',
-        config: const OmlxGenerationConfig(temperature: 0.7),
+        config: OmlxGenerationConfig(temperature: 0.7),
       );
 
       expect(
@@ -81,9 +81,9 @@ void main() {
       final mockClient = MockClient((request) async {
         if (request.url.path == '/v1/chat/completions') {
           final sseData = [
-            'data: {"id":"c1","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello"}}]}\n\n',
-            'data: {"id":"c1","choices":[{"index":0,"delta":{"content":" world"}}]}\n\n',
-            'data: {"id":"c1","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}\n\n',
+            'data: {"id":"c1","created":123456,"model":"qwen","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello"}}]}\n\n',
+            'data: {"id":"c1","created":123456,"model":"qwen","choices":[{"index":0,"delta":{"content":" world"}}]}\n\n',
+            'data: {"id":"c1","created":123456,"model":"qwen","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}\n\n',
             'data: [DONE]\n\n',
           ].join();
 

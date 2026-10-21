@@ -48,13 +48,13 @@ void main() {
       );
 
       final ai = Genkit(plugins: [plugin]);
-      final response = await ai.embedMany(
+      final response = await ai.embed(
         embedder: omlx.embedder('bge-micro'),
         documents: [
           DocumentData(content: [TextPart(text: 'first text')]),
           DocumentData(content: [TextPart(text: 'second text')]),
         ],
-        options: const OmlxEmbedConfig(dimensions: 3),
+        options: OmlxEmbedConfig(dimensions: 3),
       );
 
       expect(response.length, equals(2));

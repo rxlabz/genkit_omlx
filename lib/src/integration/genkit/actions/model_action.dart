@@ -23,15 +23,9 @@ genkit.Model<OmlxGenerationConfig> buildModelAction({
 
   return genkit.Model<OmlxGenerationConfig>(
     name: actionName,
+    customOptions: omlxGenerationConfigSchema(),
     metadata: actionMetadataForModel(definition, modelInfo: modelInfo),
     fn: (request, context) {
-      if (request == null) {
-        throw genkit.GenkitException(
-          'Model request cannot be null.',
-          status: genkit.StatusCodes.INVALID_ARGUMENT,
-        );
-      }
-
       return _runModel(
         definition: definition,
         clientManager: clientManager,
@@ -51,7 +45,7 @@ Future<genkit.ModelResponse> _runModel({
   if (request.docs != null && request.docs!.isNotEmpty) {
     throw genkit.GenkitException(
       'oMLX model actions do not support `docs` yet.',
-      status: genkit.StatusCodes.INVALID_ARGUMENT,
+      status: genkit.StatusCode.invalidArgument,
     );
   }
 
@@ -59,7 +53,7 @@ Future<genkit.ModelResponse> _runModel({
   if (hasTools && !definition.supportsTools) {
     throw genkit.GenkitException(
       'Tool use is disabled for `${definition.name}`.',
-      status: genkit.StatusCodes.FAILED_PRECONDITION,
+      status: genkit.StatusCode.failedPrecondition,
     );
   }
 
@@ -67,11 +61,11 @@ Future<genkit.ModelResponse> _runModel({
       !definition.supportsConstrainedOutput) {
     throw genkit.GenkitException(
       'Constrained output is disabled for `${definition.name}`.',
-      status: genkit.StatusCodes.FAILED_PRECONDITION,
+      status: genkit.StatusCode.failedPrecondition,
     );
   }
 
-  final config = OmlxGenerationConfig.fromJson(request.config);
+  final config = parseOmlxGenerationConfig(request.config);
   final messages = toOmlxMessages(request.messages);
   final tools = toOmlxTools(request.tools);
   final toolChoice = toOmlxToolChoice(
@@ -156,7 +150,9 @@ Future<genkit.ModelResponse> _runStreamingModel({
 
       if (delta.toolCalls != null) {
         for (final tc in delta.toolCalls!) {
-          final id = tc.id.isNotEmpty ? tc.id : 'call_${toolCallsMap.length}';
+          final id = tc.id?.isNotEmpty == true
+              ? tc.id!
+              : 'call_${toolCallsMap.length}';
           final acc = toolCallsMap.putIfAbsent(
             id,
             () => _ToolCallAccumulator(id: id, name: tc.function.name),

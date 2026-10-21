@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 void main() {
   group('OmlxGenerationConfig', () {
     test('parses from null map', () {
-      final config = OmlxGenerationConfig.fromJson(null);
+      final config = parseOmlxGenerationConfig(null);
       expect(config.temperature, isNull);
       expect(config.topP, isNull);
       expect(config.topK, isNull);
@@ -13,7 +13,7 @@ void main() {
     });
 
     test('parses camelCase and snake_case fields correctly', () {
-      final config = OmlxGenerationConfig.fromJson({
+      final config = parseOmlxGenerationConfig({
         'temperature': 0.7,
         'top_p': 0.85,
         'top_k': 50,
@@ -33,7 +33,7 @@ void main() {
     });
 
     test('preserves extra custom vendor options', () {
-      final config = OmlxGenerationConfig.fromJson({
+      final config = parseOmlxGenerationConfig({
         'temperature': 0.2,
         'custom_engine_param': true,
         'draft_model': 'qwen-0.5b',
@@ -48,11 +48,32 @@ void main() {
       expect(json['custom_engine_param'], isTrue);
       expect(json['draft_model'], equals('qwen-0.5b'));
     });
+
+    test('provides Dev UI JSON schema with bounds', () {
+      final schema = omlxGenerationConfigSchema().jsonSchema();
+      expect(schema['type'], equals('object'));
+      final properties = schema['properties'] as Map<String, dynamic>;
+      expect(properties.containsKey('temperature'), isTrue);
+      expect(properties['temperature']['minimum'], equals(0.0));
+      expect(properties['temperature']['maximum'], equals(2.0));
+      expect(properties.containsKey('topP'), isTrue);
+      expect(properties['topP']['minimum'], equals(0.0));
+      expect(properties['topP']['maximum'], equals(1.0));
+      expect(properties['topK']['minimum'], equals(1));
+      expect(properties['maxTokens']['minimum'], equals(1));
+    });
   });
 
   group('OmlxEmbedConfig', () {
+    test('parses from null map', () {
+      final config = parseOmlxEmbedConfig(null);
+      expect(config.dimensions, isNull);
+      expect(config.encodingFormat, isNull);
+      expect(config.user, isNull);
+    });
+
     test('parses fields and serializes to json', () {
-      final config = OmlxEmbedConfig.fromJson({
+      final config = parseOmlxEmbedConfig({
         'dimensions': 768,
         'encoding_format': 'float',
         'user': 'test_user',
@@ -66,6 +87,16 @@ void main() {
       expect(json['dimensions'], equals(768));
       expect(json['encoding_format'], equals('float'));
       expect(json['user'], equals('test_user'));
+    });
+
+    test('provides Dev UI JSON schema with bounds and enums', () {
+      final schema = omlxEmbedConfigSchema().jsonSchema();
+      expect(schema['type'], equals('object'));
+      final properties = schema['properties'] as Map<String, dynamic>;
+      expect(properties.containsKey('dimensions'), isTrue);
+      expect(properties['dimensions']['minimum'], equals(1));
+      expect(properties.containsKey('encoding_format'), isTrue);
+      expect(properties['encoding_format']['enum'], equals(['float', 'base64']));
     });
   });
 }
