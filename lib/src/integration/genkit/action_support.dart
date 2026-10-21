@@ -5,11 +5,172 @@ import '../../api/embedder_definition.dart';
 import '../../api/generation_config.dart';
 import '../../api/model_definition.dart';
 
-/// Name of the oMLX Genkit plugin.
-const String omlxPluginName = 'omlx';
+/// Default plugin / namespace name used when no custom name is provided.
+const String defaultOmlxNamespace = 'omlx';
+
+/// Default base URL of the local oMLX server.
+const String defaultOmlxBaseUrl = 'http://localhost:8000';
+
+/// Legacy alias for [defaultOmlxNamespace].
+const String omlxPluginName = defaultOmlxNamespace;
 
 /// Formats a model or embedder name into an action name (e.g. `omlx/<name>`).
-String actionNameFor(String name) => '$omlxPluginName/$name';
+String actionNameFor(String name, {String namespace = defaultOmlxNamespace}) =>
+    '$namespace/$name';
+
+/// Identifies the modality or API endpoint serving an oMLX model.
+///
+/// Defined as a `final class` rather than an enum so adding new model kinds
+/// in future releases does not break exhaustive switches in caller code.
+final class OmlxModelKind {
+  const OmlxModelKind._(this._name);
+
+  final String _name;
+
+  /// Chat completions (`POST /v1/chat/completions`).
+  static const OmlxModelKind chat = OmlxModelKind._('chat');
+
+  /// Text embeddings (`POST /v1/embeddings`).
+  static const OmlxModelKind embedding = OmlxModelKind._('embedding');
+
+  /// Text-to-speech (`POST /v1/audio/speech`).
+  static const OmlxModelKind speech = OmlxModelKind._('speech');
+
+  /// Speech-to-text (`POST /v1/audio/transcriptions`).
+  static const OmlxModelKind transcription = OmlxModelKind._('transcription');
+
+  /// Document reranking (`POST /v1/rerank`).
+  static const OmlxModelKind rerank = OmlxModelKind._('rerank');
+
+  @override
+  String toString() => 'OmlxModelKind.$_name';
+}
+
+final RegExp _boundedEmbedFamilyPattern = RegExp(
+  r'(^|[/\-_.])(bge|gte|e5)([/\-_.]|$)',
+);
+
+final RegExp _boundedSpeechFamilyPattern = RegExp(
+  r'(^|[/\-_.])(bark|csm)([/\-_.]|$)',
+);
+
+final RegExp _boundedTranscriptionFamilyPattern = RegExp(
+  r'(^|[/\-_.])(canary)([/\-_.]|$)',
+);
+
+/// Classifies a model identifier (and optional raw `/v1/models` metadata) into
+/// an [OmlxModelKind].
+///
+/// Classification uses two tiers:
+/// 1. **Explicit Server Metadata**: Inspects `type`, `model_type`,
+///    `engine_type`, `task`, `pipeline_tag`, and `modality` in [raw] when
+///    present.
+/// 2. **Boundary-Aware Name Heuristics**:
+///    - Rerankers (`rerank`, `cross-encoder`) are checked **before**
+///      embeddings so models like `bge-reranker-v2-m3` or `gte-reranker` are
+///      not misclassified as embedders.
+///    - Short family tokens (`bge`, `gte`, `e5`, `bark`, `csm`, `canary`) are
+///      matched on delimiter boundaries (`/`, `-`, `_`, `.`) to avoid substring
+///      collisions with commit hashes or quantization tags (e.g. `e5a1`).
+OmlxModelKind classifyModel(String modelId, {Map<String, dynamic>? raw}) {
+  if (raw != null && raw.isNotEmpty) {
+    final explicitKind = _classifyFromMetadata(raw);
+    if (explicitKind != null) {
+      return explicitKind;
+    }
+  }
+
+  final id = modelId.toLowerCase();
+
+  // 1. Rerankers (must run before embedding family checks for bge/gte-reranker)
+  if (id.contains('rerank') || id.contains('cross-encoder')) {
+    return OmlxModelKind.rerank;
+  }
+
+  // 2. Speech / TTS
+  if (id.contains('tts') ||
+      id.contains('kokoro') ||
+      id.contains('cosyvoice') ||
+      id.contains('orpheus') ||
+      id.contains('outetts') ||
+      _boundedSpeechFamilyPattern.hasMatch(id)) {
+    return OmlxModelKind.speech;
+  }
+
+  // 3. Transcription / STT
+  if (id.contains('whisper') ||
+      id.contains('transcribe') ||
+      id.contains('parakeet') ||
+      id.contains('sensevoice') ||
+      id.contains('moonshine') ||
+      id.contains('voxtral') ||
+      _boundedTranscriptionFamilyPattern.hasMatch(id)) {
+    return OmlxModelKind.transcription;
+  }
+
+  // 4. Embeddings
+  if (id.contains('embed') ||
+      id.contains('minilm') ||
+      _boundedEmbedFamilyPattern.hasMatch(id)) {
+    return OmlxModelKind.embedding;
+  }
+
+  return OmlxModelKind.chat;
+}
+
+OmlxModelKind? _classifyFromMetadata(Map<String, dynamic> raw) {
+  const keys = [
+    'type',
+    'model_type',
+    'engine_type',
+    'task',
+    'pipeline_tag',
+    'modality',
+  ];
+
+  for (final key in keys) {
+    final value = raw[key];
+    if (value is! String || value.isEmpty) continue;
+    final normalized = value.toLowerCase().trim();
+
+    switch (normalized) {
+      case 'rerank':
+      case 'reranker':
+      case 'text-ranking':
+      case 'cross-encoder':
+        return OmlxModelKind.rerank;
+      case 'embedding':
+      case 'embeddings':
+      case 'embed':
+      case 'feature-extraction':
+      case 'sentence-similarity':
+        return OmlxModelKind.embedding;
+      case 'tts':
+      case 'speech':
+      case 'text-to-speech':
+      case 'text_to_speech':
+      case 'audio-generation':
+        return OmlxModelKind.speech;
+      case 'stt':
+      case 'transcription':
+      case 'asr':
+      case 'speech-to-text':
+      case 'speech_to_text':
+      case 'automatic-speech-recognition':
+      case 'whisper':
+        return OmlxModelKind.transcription;
+      case 'chat':
+      case 'llm':
+      case 'vlm':
+      case 'text-generation':
+      case 'image-text-to-text':
+      case 'causal-lm':
+        return OmlxModelKind.chat;
+    }
+  }
+
+  return null;
+}
 
 /// Builds capability metadata for an [OmlxModelDefinition].
 genkit.ModelInfo modelInfoFor(OmlxModelDefinition definition) {
@@ -68,15 +229,66 @@ Map<String, dynamic> actionMetadataForEmbedder(
   };
 }
 
+/// Builds Genkit [genkit.ActionMetadata] for an [OmlxModelDefinition].
+genkit.ActionMetadata modelActionMetadata(
+  OmlxModelDefinition definition, {
+  String namespace = defaultOmlxNamespace,
+  genkit.ModelInfo? modelInfo,
+}) {
+  final info = modelInfo ?? modelInfoFor(definition);
+  return genkit.modelMetadata(
+    actionNameFor(definition.name, namespace: namespace),
+    info: info,
+    customOptions: omlxGenerationConfigSchema(),
+  );
+}
+
+/// Builds Genkit [genkit.ActionMetadata] for an [OmlxEmbedderDefinition].
+genkit.ActionMetadata embedderActionMetadata(
+  OmlxEmbedderDefinition definition, {
+  String namespace = defaultOmlxNamespace,
+}) {
+  final base = genkit.embedderMetadata(
+    actionNameFor(definition.name, namespace: namespace),
+    customOptions: omlxEmbedConfigSchema(),
+  );
+
+  final metadata = <String, dynamic>{
+    ...base.metadata,
+    'model': <String, dynamic>{
+      if (base.metadata['model'] is Map)
+        ...(base.metadata['model'] as Map).cast<String, dynamic>(),
+      'label':
+          definition.modelInfo?.label ?? 'oMLX Embedding - ${definition.name}',
+      if (definition.dimensions != null) 'dimensions': definition.dimensions,
+      'supports': <String, dynamic>{
+        'input': ['text'],
+        ...?definition.modelInfo?.supports,
+      },
+      'customOptions': omlxEmbedConfigSchema().jsonSchema(),
+    },
+  };
+
+  return genkit.ActionMetadata(
+    name: base.name,
+    description: base.description ?? definition.name,
+    actionType: genkit.ActionType.embedder,
+    inputSchema: genkit.EmbedRequest.$schema,
+    outputSchema: genkit.EmbedResponse.$schema,
+    metadata: metadata,
+  );
+}
+
 /// Builds raw provider metadata returned in `ModelResponse.raw`.
 Map<String, dynamic> rawResponseMetadata(
   OmlxModelDefinition definition, {
+  String namespace = defaultOmlxNamespace,
   bool structured = false,
   Map<String, dynamic>? rawResponse,
   Map<String, dynamic>? extra,
 }) {
   return <String, dynamic>{
-    'provider': omlxPluginName,
+    'provider': namespace,
     'model': definition.model,
     if (structured) 'structured': true,
     ...?rawResponse,

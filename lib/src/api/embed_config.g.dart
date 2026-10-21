@@ -24,12 +24,8 @@ base class OmlxEmbedConfig {
 
   OmlxEmbedConfig._(this._json);
 
-  OmlxEmbedConfig({int? dimensions, String? encodingFormat, String? user}) {
-    _json = {
-      'dimensions': ?dimensions,
-      'encoding_format': ?encodingFormat,
-      'user': ?user,
-    };
+  OmlxEmbedConfig({int? dimensions, String? user}) {
+    _json = {'dimensions': ?dimensions, 'user': ?user};
   }
 
   late final Map<String, dynamic> _json;
@@ -49,20 +45,6 @@ base class OmlxEmbedConfig {
       _json.remove('dimensions');
     } else {
       _json['dimensions'] = value;
-    }
-  }
-
-  /// Optional encoding format: "float" (default) or "base64".
-  String? get encodingFormat {
-    return _json['encoding_format'] as String?;
-  }
-
-  /// Optional encoding format: "float" (default) or "base64".
-  set encodingFormat(String? value) {
-    if (value == null) {
-      _json.remove('encoding_format');
-    } else {
-      _json['encoding_format'] = value;
     }
   }
 
@@ -107,10 +89,6 @@ base class _OmlxEmbedConfigTypeFactory extends SchemanticType<OmlxEmbedConfig> {
       'description': 'Request-time embedding options for oMLX models.',
       'properties': <String, Object?>{
         'dimensions': <String, Object?>{'type': 'integer', 'minimum': 1},
-        'encoding_format': <String, Object?>{
-          'type': 'string',
-          'enum': ['float', 'base64'],
-        },
         'user': <String, Object?>{'type': 'string'},
       },
     },

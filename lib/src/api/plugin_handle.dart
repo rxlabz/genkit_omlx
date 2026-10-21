@@ -40,31 +40,40 @@ class OmlxPluginHandle {
 
   /// Creates a configured [OmlxPlugin] instance.
   ///
-  /// - [baseUrl]: Base URL of the oMLX server (default: `http://localhost:8000`).
-  /// - [apiKey]: Optional Bearer API key.
+  /// - [name]: Plugin and namespace identifier (default: [defaultOmlxNamespace], `'omlx'`).
+  /// - [baseUrl]: Base URL of the oMLX server (defaults to `OMLX_BASE_URL` env var, or [defaultOmlxBaseUrl]).
+  /// - [apiKey]: Optional Bearer API key (falls back to the `OMLX_API_KEY` env var).
   /// - [models]: Optional list of statically declared model definitions.
   /// - [embedders]: Optional list of statically declared embedder definitions.
   /// - [httpClient]: Optional custom `http.Client` (useful for testing or proxying).
   /// - [timeout]: Request timeout (default: 120 seconds).
   /// - [defaultHeaders]: Headers attached to every outgoing request.
+  /// - [configVar]: Environment variable lookup function (defaults to [getConfigVar]).
   OmlxPlugin call({
-    String baseUrl = 'http://localhost:8000',
+    String name = defaultOmlxNamespace,
+    String? baseUrl,
     String? apiKey,
     List<OmlxModelDefinition>? models,
     List<OmlxEmbedderDefinition>? embedders,
     http.Client? httpClient,
     Duration timeout = const Duration(seconds: 120),
     Map<String, String> defaultHeaders = const {},
+    String? Function(String name) configVar = getConfigVar,
   }) {
+    final resolvedApiKey = apiKey ?? configVar('OMLX_API_KEY');
+    final resolvedBaseUrl =
+        baseUrl ?? configVar('OMLX_BASE_URL') ?? defaultOmlxBaseUrl;
+
     final clientManager = OmlxClientManager(
-      baseUrl: baseUrl,
-      apiKey: apiKey,
+      baseUrl: resolvedBaseUrl,
+      apiKey: resolvedApiKey,
       httpClient: httpClient,
       timeout: timeout,
       defaultHeaders: defaultHeaders,
     );
 
     return OmlxPlugin(
+      name: name,
       clientManager: clientManager,
       models: models,
       embedders: embedders,
@@ -77,10 +86,11 @@ class OmlxPluginHandle {
   /// model identifier supported by the oMLX server.
   ModelRef<OmlxGenerationConfig> model(
     String name, {
+    String namespace = defaultOmlxNamespace,
     OmlxGenerationConfig? config,
   }) {
     return modelRef<OmlxGenerationConfig>(
-      actionNameFor(name),
+      actionNameFor(name, namespace: namespace),
       config: config,
       customOptions: omlxGenerationConfigSchema(),
     );
@@ -90,9 +100,12 @@ class OmlxPluginHandle {
   ///
   /// The [name] can be either a declared [OmlxEmbedderDefinition.name] or any
   /// embedding model supported by the oMLX server.
-  EmbedderRef<OmlxEmbedConfig> embedder(String name) {
+  EmbedderRef<OmlxEmbedConfig> embedder(
+    String name, {
+    String namespace = defaultOmlxNamespace,
+  }) {
     return embedderRef<OmlxEmbedConfig>(
-      actionNameFor(name),
+      actionNameFor(name, namespace: namespace),
       customOptions: omlxEmbedConfigSchema(),
     );
   }

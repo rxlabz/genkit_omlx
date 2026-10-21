@@ -68,35 +68,30 @@ void main() {
     test('parses from null map', () {
       final config = parseOmlxEmbedConfig(null);
       expect(config.dimensions, isNull);
-      expect(config.encodingFormat, isNull);
       expect(config.user, isNull);
     });
 
     test('parses fields and serializes to json', () {
       final config = parseOmlxEmbedConfig({
         'dimensions': 768,
-        'encoding_format': 'float',
         'user': 'test_user',
       });
 
       expect(config.dimensions, equals(768));
-      expect(config.encodingFormat, equals('float'));
       expect(config.user, equals('test_user'));
 
       final json = config.toJson();
       expect(json['dimensions'], equals(768));
-      expect(json['encoding_format'], equals('float'));
       expect(json['user'], equals('test_user'));
     });
 
-    test('provides Dev UI JSON schema with bounds and enums', () {
+    test('provides Dev UI JSON schema with bounds', () {
       final schema = omlxEmbedConfigSchema().jsonSchema();
       expect(schema['type'], equals('object'));
       final properties = schema['properties'] as Map<String, dynamic>;
       expect(properties.containsKey('dimensions'), isTrue);
       expect(properties['dimensions']['minimum'], equals(1));
-      expect(properties.containsKey('encoding_format'), isTrue);
-      expect(properties['encoding_format']['enum'], equals(['float', 'base64']));
+      expect(properties.containsKey('user'), isTrue);
     });
   });
 }

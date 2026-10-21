@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:genkit/plugin.dart';
+import 'package:logging/logging.dart';
 
 import '../../api/embedder_definition.dart';
 import '../../api/model_definition.dart';
@@ -9,10 +10,13 @@ import 'action_support.dart';
 import 'actions/embedder_action.dart';
 import 'actions/model_action.dart';
 
+final _logger = Logger('genkit_omlx');
+
 /// Genkit plugin connecting local models served via oMLX.
 class OmlxPlugin extends GenkitPlugin {
   /// Creates an oMLX Genkit plugin.
   OmlxPlugin({
+    this.name = defaultOmlxNamespace,
     required this.clientManager,
     List<OmlxModelDefinition>? models,
     List<OmlxEmbedderDefinition>? embedders,
@@ -43,6 +47,9 @@ class OmlxPlugin extends GenkitPlugin {
     }
   }
 
+  @override
+  final String name;
+
   /// The underlying client manager.
   final OmlxClientManager clientManager;
   final List<OmlxModelDefinition> _models;
@@ -50,9 +57,6 @@ class OmlxPlugin extends GenkitPlugin {
 
   final Map<String, Action> _resolvedActions = {};
   List<Action>? _initializedActions;
-
-  @override
-  String get name => omlxPluginName;
 
   /// Disposes the plugin and closes any open HTTP connections.
   Future<void> dispose() async {
@@ -71,9 +75,10 @@ class OmlxPlugin extends GenkitPlugin {
       final action = buildModelAction(
         definition: def,
         clientManager: clientManager,
+        namespace: name,
       );
       actions.add(action);
-      _resolvedActions[actionNameFor(def.name)] = action;
+      _resolvedActions[actionNameFor(def.name, namespace: name)] = action;
       _resolvedActions[def.name] = action;
     }
 
@@ -81,9 +86,10 @@ class OmlxPlugin extends GenkitPlugin {
       final action = buildEmbedderAction(
         definition: def,
         clientManager: clientManager,
+        namespace: name,
       );
       actions.add(action);
-      _resolvedActions[actionNameFor(def.name)] = action;
+      _resolvedActions[actionNameFor(def.name, namespace: name)] = action;
       _resolvedActions[def.name] = action;
     }
 
@@ -93,10 +99,13 @@ class OmlxPlugin extends GenkitPlugin {
 
   @override
   Action? resolve(ActionType actionType, String name) {
-    // Strip optional 'omlx/' prefix if present
-    final normalizedName = name.startsWith('$omlxPluginName/')
-        ? name.substring(omlxPluginName.length + 1)
-        : name;
+    // Strip optional namespace prefix if present
+    var normalizedName = name;
+    if (name.startsWith('${this.name}/')) {
+      normalizedName = name.substring(this.name.length + 1);
+    } else if (name.startsWith('$defaultOmlxNamespace/')) {
+      normalizedName = name.substring(defaultOmlxNamespace.length + 1);
+    }
 
     final cached = _resolvedActions[name] ?? _resolvedActions[normalizedName];
     if (cached != null) {
@@ -113,6 +122,7 @@ class OmlxPlugin extends GenkitPlugin {
       final action = buildModelAction(
         definition: definition,
         clientManager: clientManager,
+        namespace: this.name,
       );
       _resolvedActions[name] = action;
       _resolvedActions[normalizedName] = action;
@@ -128,6 +138,7 @@ class OmlxPlugin extends GenkitPlugin {
       final action = buildEmbedderAction(
         definition: definition,
         clientManager: clientManager,
+        namespace: this.name,
       );
       _resolvedActions[name] = action;
       _resolvedActions[normalizedName] = action;
@@ -140,49 +151,44 @@ class OmlxPlugin extends GenkitPlugin {
   @override
   Future<List<ActionMetadata>> list() async {
     final metadataList = <ActionMetadata>[];
-    final knownModelNames = <String>{};
+    final declaredIds = <String>{};
 
     for (final def in _models) {
-      knownModelNames.add(def.name);
-      metadataList.add(
-        ActionMetadata(
-          name: actionNameFor(def.name),
-          description: def.name,
-          actionType: ActionType.model,
-          metadata: actionMetadataForModel(def),
-        ),
-      );
+      declaredIds.add(def.name);
+      declaredIds.add(def.model);
+      metadataList.add(modelActionMetadata(def, namespace: name));
     }
 
     for (final def in _embedders) {
-      metadataList.add(
-        ActionMetadata(
-          name: actionNameFor(def.name),
-          description: def.name,
-          actionType: ActionType.embedder,
-          metadata: actionMetadataForEmbedder(def),
-        ),
-      );
+      declaredIds.add(def.name);
+      declaredIds.add(def.model);
+      metadataList.add(embedderActionMetadata(def, namespace: name));
     }
 
     // Try to dynamically discover models currently known to oMLX server
     try {
       final serverModels = await clientManager.client.models.list();
       for (final m in serverModels.data) {
-        if (!knownModelNames.contains(m.id)) {
+        if (declaredIds.contains(m.id)) {
+          continue;
+        }
+        final kind = classifyModel(m.id, raw: m.raw);
+        if (kind == OmlxModelKind.embedding) {
+          declaredIds.add(m.id);
+          final def = OmlxEmbedderDefinition(name: m.id);
+          metadataList.add(embedderActionMetadata(def, namespace: name));
+        } else if (kind == OmlxModelKind.chat) {
+          declaredIds.add(m.id);
           final def = OmlxModelDefinition(name: m.id);
-          metadataList.add(
-            ActionMetadata(
-              name: actionNameFor(def.name),
-              description: def.name,
-              actionType: ActionType.model,
-              metadata: actionMetadataForModel(def),
-            ),
-          );
+          metadataList.add(modelActionMetadata(def, namespace: name));
         }
       }
-    } catch (_) {
-      // If server is currently unreachable or offline, return statically known actions
+    } catch (e, stackTrace) {
+      _logger.warning(
+        'Failed to list models from $name; falling back to statically declared actions: $e',
+        e,
+        stackTrace,
+      );
     }
 
     return metadataList;

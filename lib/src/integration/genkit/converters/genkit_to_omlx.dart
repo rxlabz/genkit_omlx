@@ -238,7 +238,7 @@ bool shouldUseStructuredGeneration(genkit.OutputConfig? output) {
 }
 
 /// Extracts plain text from a Genkit [genkit.DocumentData] for embedding.
-String documentToPlainText(genkit.DocumentData document) {
+String documentToPlainText(genkit.DocumentData document, {int? index}) {
   final buffer = StringBuffer();
 
   for (final part in document.content) {
@@ -247,14 +247,24 @@ String documentToPlainText(genkit.DocumentData document) {
     } else if (part.isReasoning) {
       continue;
     } else {
+      final indexSuffix = index != null ? ' at index $index' : '';
       throw genkit.GenkitException(
-        'oMLX embeddings only support text-only documents.',
+        'Document$indexSuffix contains non-text part. oMLX embedders accept text only.',
         status: genkit.StatusCode.invalidArgument,
       );
     }
   }
 
-  return buffer.toString();
+  final text = buffer.toString();
+  if (text.trim().isEmpty) {
+    final indexSuffix = index != null ? ' at index $index' : '';
+    throw genkit.GenkitException(
+      'Document$indexSuffix has no text content to embed. oMLX embedders accept text only.',
+      status: genkit.StatusCode.invalidArgument,
+    );
+  }
+
+  return text;
 }
 
 omlx.ContentPart _toOmlxImagePart(genkit.Media media) {

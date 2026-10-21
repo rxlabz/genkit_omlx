@@ -1,5 +1,7 @@
 import 'package:genkit/genkit.dart' show ModelInfo;
 
+import '../integration/genkit/action_support.dart' show OmlxModelKind;
+
 /// Static configuration for an oMLX model registered with Genkit.
 ///
 /// Each definition specifies the Genkit action name, the underlying oMLX
@@ -21,6 +23,7 @@ class OmlxModelDefinition {
   const OmlxModelDefinition({
     required this.name,
     String? model,
+    this.kind,
     this.supportsTools = true,
     this.supportsConstrainedOutput = true,
     this.supportsMedia = true,
@@ -33,6 +36,10 @@ class OmlxModelDefinition {
 
   /// Underlying model identifier passed to oMLX (e.g. `mlx-community/Qwen2.5-7B-Instruct-4bit`).
   final String model;
+
+  /// Optional explicit model kind override when the model name does not follow
+  /// standard naming conventions.
+  final OmlxModelKind? kind;
 
   /// Whether this model accepts Genkit tool requests.
   final bool supportsTools;

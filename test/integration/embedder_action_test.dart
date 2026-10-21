@@ -178,5 +178,129 @@ void main() {
         ),
       );
     });
+
+    test('batches large document inputs into maxEmbeddingBatchSize chunks', () async {
+      final capturedBatches = <List<String>>[];
+
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/v1/embeddings') {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          final inputs = (body['input'] as List).cast<String>();
+          capturedBatches.add(inputs);
+
+          final responsePayload = {
+            'object': 'list',
+            'model': 'bge-micro',
+            'data': [
+              for (var i = 0; i < inputs.length; i++)
+                {
+                  'object': 'embedding',
+                  'index': i,
+                  'embedding': [i.toDouble()],
+                },
+            ],
+            'usage': {'prompt_tokens': inputs.length, 'total_tokens': inputs.length},
+          };
+          return http.Response(
+            jsonEncode(responsePayload),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final plugin = omlx(
+        httpClient: mockClient,
+        embedders: const [OmlxEmbedderDefinition(name: 'bge-micro')],
+      );
+
+      final totalDocs = 520;
+      final docs = List.generate(
+        totalDocs,
+        (i) => DocumentData(content: [TextPart(text: 'text item $i')]),
+      );
+
+      final ai = Genkit(plugins: [plugin]);
+      final response = await ai.embed(
+        embedder: omlx.embedder('bge-micro'),
+        documents: docs,
+      );
+
+      expect(response.length, equals(520));
+      expect(capturedBatches.length, equals(2));
+      expect(capturedBatches[0].length, equals(512));
+      expect(capturedBatches[1].length, equals(8));
+    });
+
+    test('rejects document with empty text content', () async {
+      final mockClient = MockClient((request) async => http.Response('ok', 200));
+      final plugin = omlx(
+        httpClient: mockClient,
+        embedders: const [OmlxEmbedderDefinition(name: 'bge-micro')],
+      );
+
+      final ai = Genkit(plugins: [plugin]);
+      expect(
+        () => ai.embed(
+          embedder: omlx.embedder('bge-micro'),
+          documents: [
+            DocumentData(content: [TextPart(text: '   ')]),
+          ],
+        ),
+        throwsA(
+          isA<GenkitException>().having(
+            (e) => e.status,
+            'status',
+            equals(StatusCode.invalidArgument),
+          ),
+        ),
+      );
+    });
+
+    test('validates server returns expected embedding count', () async {
+      final mockClient = MockClient((request) async {
+        final responsePayload = {
+          'object': 'list',
+          'model': 'bge-micro',
+          'data': [
+            // Returns only 1 item when 2 were sent
+            {
+              'object': 'embedding',
+              'index': 0,
+              'embedding': [0.1],
+            },
+          ],
+        };
+        return http.Response(
+          jsonEncode(responsePayload),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final plugin = omlx(
+        httpClient: mockClient,
+        embedders: const [OmlxEmbedderDefinition(name: 'bge-micro')],
+      );
+
+      final ai = Genkit(plugins: [plugin]);
+      expect(
+        () => ai.embed(
+          embedder: omlx.embedder('bge-micro'),
+          documents: [
+            DocumentData(content: [TextPart(text: 'doc 0')]),
+            DocumentData(content: [TextPart(text: 'doc 1')]),
+          ],
+        ),
+        throwsA(
+          isA<GenkitException>().having(
+            (e) => e.status,
+            'status',
+            equals(StatusCode.internal),
+          ),
+        ),
+      );
+    });
   });
 }

@@ -18,9 +18,10 @@ typedef _ModelActionContext =
 genkit.Model<OmlxGenerationConfig> buildModelAction({
   required OmlxModelDefinition definition,
   required OmlxClientManager clientManager,
+  String namespace = defaultOmlxNamespace,
 }) {
   final modelInfo = modelInfoFor(definition);
-  final actionName = actionNameFor(definition.name);
+  final actionName = actionNameFor(definition.name, namespace: namespace);
 
   return genkit.Model<OmlxGenerationConfig>(
     name: actionName,
@@ -32,6 +33,7 @@ genkit.Model<OmlxGenerationConfig> buildModelAction({
         clientManager: clientManager,
         request: request,
         context: context,
+        namespace: namespace,
       );
     },
   );
@@ -42,6 +44,7 @@ Future<genkit.ModelResponse> _runModel({
   required OmlxClientManager clientManager,
   required genkit.ModelRequest request,
   required _ModelActionContext context,
+  String namespace = defaultOmlxNamespace,
 }) async {
   if (request.docs != null && request.docs!.isNotEmpty) {
     throw genkit.GenkitException(
@@ -107,6 +110,7 @@ Future<genkit.ModelResponse> _runModel({
       responseFormat: responseFormat,
       context: context,
       started: started,
+      namespace: namespace,
     );
   }
 
@@ -117,6 +121,7 @@ Future<genkit.ModelResponse> _runModel({
       latencyMs: started.elapsedMilliseconds.toDouble(),
       raw: rawResponseMetadata(
         definition,
+        namespace: namespace,
         structured: responseFormat != null,
         rawResponse: completion.toJson(),
       ),
@@ -133,6 +138,7 @@ Future<genkit.ModelResponse> _runStreamingModel({
   required omlx.ResponseFormat? responseFormat,
   required _ModelActionContext context,
   required Stopwatch started,
+  String namespace = defaultOmlxNamespace,
 }) async {
   final textBuffer = StringBuffer();
   final reasoningBuffer = StringBuffer();
@@ -226,6 +232,7 @@ Future<genkit.ModelResponse> _runStreamingModel({
     latencyMs: started.elapsedMilliseconds.toDouble(),
     raw: rawResponseMetadata(
       definition,
+      namespace: namespace,
       structured: responseFormat != null,
       rawResponse: {
         'finish_reason': ?finishReason,

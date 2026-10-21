@@ -19,10 +19,36 @@ void main() {
       expect(plugin.clientManager.apiKey, equals('secret-token'));
     });
 
+    test('creates plugin instance with custom namespace', () {
+      final plugin = omlx(name: 'omlx-studio');
+      expect(plugin.name, equals('omlx-studio'));
+    });
+
+    test('falls back to environment variables via configVar', () {
+      final env = {
+        'OMLX_BASE_URL': 'http://lan-mac:8080',
+        'OMLX_API_KEY': 'token-from-omlx-env',
+      };
+      final plugin = omlx(configVar: (key) => env[key]);
+      expect(plugin.clientManager.baseUrl, equals('http://lan-mac:8080'));
+      expect(plugin.clientManager.apiKey, equals('token-from-omlx-env'));
+    });
+
+    test('does not read OPENAI_API_KEY when OMLX_API_KEY is absent', () {
+      final env = {'OPENAI_API_KEY': 'token-from-openai-env'};
+      final plugin = omlx(configVar: (key) => env[key]);
+      expect(plugin.clientManager.apiKey, isNull);
+    });
+
     test('creates typed model reference', () {
       final ref = omlx.model('qwen');
       expect(ref.name, equals('omlx/qwen'));
       expect(ref.customOptions, isNotNull);
+    });
+
+    test('creates typed model reference with custom namespace', () {
+      final ref = omlx.model('qwen', namespace: 'omlx-studio');
+      expect(ref.name, equals('omlx-studio/qwen'));
     });
 
     test('creates typed model reference with config', () {
@@ -38,6 +64,12 @@ void main() {
     test('creates typed embedder reference', () {
       final ref = omlx.embedder('bge-micro');
       expect(ref.name, equals('omlx/bge-micro'));
+      expect(ref.customOptions, isNotNull);
+    });
+
+    test('creates typed embedder reference with custom namespace', () {
+      final ref = omlx.embedder('bge-micro', namespace: 'omlx-studio');
+      expect(ref.name, equals('omlx-studio/bge-micro'));
       expect(ref.customOptions, isNotNull);
     });
   });
