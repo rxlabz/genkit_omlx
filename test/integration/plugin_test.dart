@@ -141,7 +141,7 @@ void main() {
       expect(bgeMeta.outputSchema, isNotNull);
     });
 
-    test('deduplicates static definitions by both name and model ID and skips rerankers in list()', () async {
+    test('deduplicates static definitions by both name and model ID and classifies rerankers in list()', () async {
       final mockClient = MockClient((request) async {
         if (request.url.path == '/v1/models') {
           final payload = {
@@ -151,7 +151,7 @@ void main() {
               {'id': 'mlx-community/Qwen2.5-7B-Instruct-4bit', 'object': 'model'},
               // Matches static embedder's custom `name` (which looks like chat to heuristics)
               {'id': 'my-custom-vectors', 'object': 'model'},
-              // Reranker containing 'bge' - should NOT be listed as embedder or chat
+              // Reranker containing 'bge' - should be listed as reranker, NOT embedder or chat
               {'id': 'BAAI/bge-reranker-v2-m3', 'object': 'model'},
               // Server metadata explicitly marking a generic ID as embedding
               {
@@ -192,11 +192,15 @@ void main() {
           .where((m) => m.actionType == ActionType.embedder)
           .map((m) => m.name)
           .toList();
+      final rerankerNames = metadataList
+          .where((m) => m.actionType == omlxRerankerActionType)
+          .map((m) => m.name)
+          .toList();
 
       // Static qwen listed once under alias, underlying ID not duplicated
       expect(chatNames, equals(['omlx/qwen']));
 
-      // Static custom embedder + server metadata-tagged embedder; bge-reranker excluded
+      // Static custom embedder + server metadata-tagged embedder; bge-reranker excluded from embedders
       expect(
         embedderNames,
         unorderedEquals([
@@ -204,6 +208,9 @@ void main() {
           'omlx/custom-local-encoder-v1',
         ]),
       );
+
+      // bge-reranker classified and listed under reranker action type
+      expect(rerankerNames, equals(['omlx/BAAI/bge-reranker-v2-m3']));
     });
 
     test('supports custom plugin namespace for multi-instance deployments', () async {
@@ -257,6 +264,94 @@ void main() {
       await plugin.dispose();
       // Should complete without error
       expect(closed, isFalse);
+    });
+
+    test('queries /health, /v1/models/status, and /v1/models/{id}/unload with alias resolution', () async {
+      String? unloadedPath;
+
+      final mockClient = MockClient((request) async {
+        if (request.method == 'GET' && request.url.path == '/health') {
+          return http.Response(
+            jsonEncode({
+              'status': 'ok',
+              'version': '0.4.2',
+              'default_model': 'mlx-community/Qwen2.5-7B-Instruct-4bit',
+              'engine_pool': {'active_models': 1, 'memory_gb': 5.2},
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'GET' && request.url.path == '/v1/models/status') {
+          return http.Response(
+            jsonEncode({
+              'mlx-community/Qwen2.5-7B-Instruct-4bit': {
+                'loaded': true,
+                'engine_type': 'mlx_lm',
+                'memory_bytes': 5583457484,
+              },
+              'BAAI/bge-reranker-v2-m3': {
+                'loaded': false,
+                'engine_type': 'rerank',
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'POST' && request.url.path.endsWith('/unload')) {
+          unloadedPath = request.url.path;
+          return http.Response(
+            jsonEncode({
+              'status': 'unloaded',
+              'message': 'Evicted from Apple Silicon unified memory',
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final plugin = omlx(
+        httpClient: mockClient,
+        models: const [
+          OmlxModelDefinition(
+            name: 'qwen',
+            model: 'mlx-community/Qwen2.5-7B-Instruct-4bit',
+          ),
+        ],
+      );
+
+      final health = await plugin.health();
+      expect(health.isHealthy, isTrue);
+      expect(health.version, equals('0.4.2'));
+      expect(health.enginePool?['active_models'], equals(1));
+
+      final statuses = await plugin.modelsStatus();
+      expect(statuses.length, equals(2));
+
+      // Lookup by registered alias 'qwen' or 'omlx/qwen'
+      final qwenStatus = await plugin.modelStatus('omlx/qwen');
+      expect(qwenStatus, isNotNull);
+      expect(
+        qwenStatus!.modelId,
+        equals('mlx-community/Qwen2.5-7B-Instruct-4bit'),
+      );
+      expect(qwenStatus.isLoaded, isTrue);
+      expect(qwenStatus.details['memory_bytes'], equals(5583457484));
+
+      // Unload by registered alias 'qwen' -> resolves to URL-encoded wire ID
+      final unloadRes = await plugin.unloadModel('qwen');
+      expect(unloadRes.success, isTrue);
+      expect(
+        unloadRes.modelId,
+        equals('mlx-community/Qwen2.5-7B-Instruct-4bit'),
+      );
+      expect(
+        unloadedPath,
+        equals('/v1/models/mlx-community%2FQwen2.5-7B-Instruct-4bit/unload'),
+      );
     });
   });
 

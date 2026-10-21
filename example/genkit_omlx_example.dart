@@ -30,6 +30,12 @@ void main() async {
         dimensions: 384,
       ),
     ],
+    rerankers: const [
+      OmlxRerankerDefinition(
+        name: 'bge-reranker',
+        model: 'jinaai/jina-reranker-v3-mlx',
+      ),
+    ],
   );
 
   final ai = Genkit(plugins: [plugin]);
@@ -148,6 +154,40 @@ void main() async {
     }
   } catch (e) {
     print('TTS skipped: $e\n');
+  }
+
+  print('=== 7. Document Reranking (Cross-Encoder) ===');
+  try {
+    const query = 'How does unified memory work on Apple Silicon?';
+    final candidateTexts = [
+      'Sourdough bread fermentation takes several hours at room temperature.',
+      'Apple Silicon shares physical LPDDR5X unified memory across CPU, GPU, and Neural Engine with high bandwidth.',
+      'The Eiffel Tower is located in Paris, France.',
+      'Unified memory eliminates redundant copying between host system memory and dedicated GPU VRAM.',
+    ];
+
+    final ranked = await ai.rerank(
+      reranker: omlx.reranker('bge-reranker'),
+      query: query,
+      texts: candidateTexts,
+      options: OmlxRerankConfig(topN: 2),
+    );
+
+    print('Query: "$query"');
+    print('Top ${ranked.length} ranked documents:');
+    for (var i = 0; i < ranked.length; i++) {
+      final doc = ranked[i];
+      final text = doc.document.content
+          .where((p) => p.isText)
+          .map((p) => p.text)
+          .join();
+      print(
+        '  #${i + 1} [score: ${doc.score.toStringAsFixed(4)}, orig_index: ${doc.index}] $text',
+      );
+    }
+    print('');
+  } catch (e) {
+    print('Reranker skipped: $e\n');
   }
 
   await plugin.dispose();

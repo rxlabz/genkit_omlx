@@ -4,6 +4,8 @@ import '../../api/embed_config.dart';
 import '../../api/embedder_definition.dart';
 import '../../api/generation_config.dart';
 import '../../api/model_definition.dart';
+import '../../api/rerank_config.dart';
+import '../../api/reranker_definition.dart';
 import '../../api/speech_config.dart';
 import '../../api/transcription_config.dart';
 
@@ -400,6 +402,42 @@ genkit.ActionMetadata embedderActionMetadata(
     inputSchema: genkit.EmbedRequest.$schema,
     outputSchema: genkit.EmbedResponse.$schema,
     metadata: metadata,
+  );
+}
+
+/// Builds action metadata for an [OmlxRerankerDefinition].
+Map<String, dynamic> actionMetadataForReranker(
+  OmlxRerankerDefinition definition,
+) {
+  final info = definition.modelInfo;
+  final label = info?.label ?? 'oMLX Reranker - ${definition.name}';
+  return <String, dynamic>{
+    'label': label,
+    'description': definition.name,
+    'reranker': <String, dynamic>{
+      'label': label,
+      'supports': <String, dynamic>{
+        'input': ['text'],
+        ...?info?.supports,
+      },
+      ...info?.toJson() ?? const <String, dynamic>{},
+      'customOptions': omlxRerankConfigSchema().jsonSchema(),
+    },
+  };
+}
+
+/// Builds Genkit [genkit.ActionMetadata] for an [OmlxRerankerDefinition].
+genkit.ActionMetadata rerankerActionMetadata(
+  OmlxRerankerDefinition definition, {
+  String namespace = defaultOmlxNamespace,
+}) {
+  return genkit.ActionMetadata(
+    name: actionNameFor(definition.name, namespace: namespace),
+    description: definition.name,
+    actionType: omlxRerankerActionType,
+    inputSchema: OmlxRerankRequest.$schema,
+    outputSchema: OmlxRerankResponse.$schema,
+    metadata: actionMetadataForReranker(definition),
   );
 }
 

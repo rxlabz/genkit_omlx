@@ -8,6 +8,8 @@ import 'embed_config.dart';
 import 'embedder_definition.dart';
 import 'generation_config.dart';
 import 'model_definition.dart';
+import 'rerank_config.dart';
+import 'reranker_definition.dart';
 import 'speech_config.dart';
 import 'transcription_config.dart';
 
@@ -47,6 +49,7 @@ class OmlxPluginHandle {
   /// - [apiKey]: Optional Bearer API key (falls back to the `OMLX_API_KEY` env var).
   /// - [models]: Optional list of statically declared model definitions.
   /// - [embedders]: Optional list of statically declared embedder definitions.
+  /// - [rerankers]: Optional list of statically declared reranker definitions.
   /// - [httpClient]: Optional custom `http.Client` (useful for testing or proxying).
   /// - [timeout]: Request timeout (default: 120 seconds).
   /// - [defaultHeaders]: Headers attached to every outgoing request.
@@ -57,6 +60,7 @@ class OmlxPluginHandle {
     String? apiKey,
     List<OmlxModelDefinition>? models,
     List<OmlxEmbedderDefinition>? embedders,
+    List<OmlxRerankerDefinition>? rerankers,
     http.Client? httpClient,
     Duration timeout = const Duration(seconds: 120),
     Map<String, String> defaultHeaders = const {},
@@ -79,6 +83,7 @@ class OmlxPluginHandle {
       clientManager: clientManager,
       models: models,
       embedders: embedders,
+      rerankers: rerankers,
     );
   }
 
@@ -143,6 +148,22 @@ class OmlxPluginHandle {
       actionNameFor(name, namespace: namespace),
       config: config,
       customOptions: omlxTranscriptionConfigSchema(),
+    );
+  }
+
+  /// Returns a typed Genkit reranker reference for [name] (`POST /v1/rerank`).
+  ///
+  /// The [name] can be either a declared [OmlxRerankerDefinition.name] or any
+  /// cross-encoder / reranker model supported by the oMLX server.
+  OmlxRerankerRef<OmlxRerankConfig> reranker(
+    String name, {
+    String namespace = defaultOmlxNamespace,
+    OmlxRerankConfig? config,
+  }) {
+    return OmlxRerankerRef<OmlxRerankConfig>(
+      actionNameFor(name, namespace: namespace),
+      config: config,
+      customOptions: omlxRerankConfigSchema(),
     );
   }
 }

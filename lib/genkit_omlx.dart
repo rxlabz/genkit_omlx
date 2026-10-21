@@ -2,8 +2,9 @@
 ///
 /// This package lets Genkit applications run models hosted on the [oMLX](https://github.com/jundot/omlx)
 /// inference server, supporting streaming, tool calling, structured JSON output,
-/// reasoning models (`<think>` blocks), text embeddings, speech synthesis (TTS),
-/// and audio transcription (STT).
+/// reasoning models (`<think>` blocks), text embeddings, semantic document
+/// reranking, speech synthesis (TTS), audio transcription (STT), and unified
+/// memory management.
 ///
 /// Use [omlx] to:
 ///
@@ -12,6 +13,7 @@
 /// - reference a speech synthesis (TTS) model via `omlx.speechModel(...)`
 /// - reference a speech-to-text (STT) model via `omlx.transcriptionModel(...)`
 /// - reference an embedder via `omlx.embedder(...)`
+/// - reference a document reranker via `omlx.reranker(...)`
 ///
 /// ```dart
 /// import 'package:genkit/genkit.dart';
@@ -37,7 +39,15 @@
 library;
 
 export 'package:domlx/domlx.dart'
-    show OmlxApiException, OmlxException, OmlxNetworkException;
+    show
+        HealthResponse,
+        ModelStatus,
+        OmlxApiException,
+        OmlxException,
+        OmlxNetworkException,
+        RerankResponse,
+        RerankResult,
+        UnloadModelResponse;
 
 export 'src/api/embed_config.dart'
     show
@@ -52,6 +62,16 @@ export 'src/api/generation_config.dart'
         parseOmlxGenerationConfig;
 export 'src/api/model_definition.dart' show OmlxModelDefinition;
 export 'src/api/plugin_handle.dart' show OmlxPluginHandle, omlx;
+export 'src/api/rerank_config.dart'
+    show
+        OmlxRankedDocument,
+        OmlxRerankConfig,
+        OmlxRerankRequest,
+        OmlxRerankResponse,
+        omlxRerankConfigSchema,
+        parseOmlxRerankConfig;
+export 'src/api/reranker_definition.dart'
+    show OmlxRerankerDefinition, OmlxRerankerRef, omlxRerankerActionType;
 export 'src/api/speech_config.dart'
     show
         OmlxSpeechConfig,
@@ -64,4 +84,6 @@ export 'src/api/transcription_config.dart'
         parseOmlxTranscriptionConfig;
 export 'src/integration/genkit/action_support.dart'
     show OmlxModelKind, classifyModel, defaultOmlxBaseUrl, defaultOmlxNamespace;
-export 'src/integration/genkit/plugin.dart' show OmlxPlugin;
+export 'src/integration/genkit/actions/reranker_action.dart' show OmlxReranker;
+export 'src/integration/genkit/plugin.dart'
+    show OmlxGenkitRerankExtension, OmlxPlugin;

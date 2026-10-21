@@ -149,4 +149,27 @@ void main() {
       expect(properties['temperature']['maximum'], equals(1.0));
     });
   });
+
+  group('OmlxRerankConfig', () {
+    test('parses camelCase and snake_case fields correctly', () {
+      final config = parseOmlxRerankConfig({
+        'version': 'BAAI/bge-reranker-v2-m3',
+        'topN': 5,
+        'returnDocuments': false,
+      });
+
+      expect(config.version, equals('BAAI/bge-reranker-v2-m3'));
+      expect(config.topN, equals(5));
+      expect(config.returnDocuments, isFalse);
+    });
+
+    test('provides Dev UI JSON schema with top_n bounds', () {
+      final schema = omlxRerankConfigSchema().jsonSchema();
+      expect(schema['type'], equals('object'));
+      final properties = schema['properties'] as Map<String, dynamic>;
+      expect(properties.containsKey('top_n'), isTrue);
+      expect(properties['top_n']['minimum'], equals(1));
+      expect(properties.containsKey('return_documents'), isTrue);
+    });
+  });
 }

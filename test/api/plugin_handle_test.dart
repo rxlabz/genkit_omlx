@@ -116,6 +116,23 @@ void main() {
       expect(ref.name, equals('omlx-studio/whisper'));
       expect(ref.customOptions, isNotNull);
     });
+
+    test('creates typed reranker reference', () {
+      final ref = omlx.reranker(
+        'bge-reranker',
+        config: OmlxRerankConfig(topN: 3, returnDocuments: true),
+      );
+      expect(ref.name, equals('omlx/bge-reranker'));
+      expect(ref.config?.topN, equals(3));
+      expect(ref.config?.returnDocuments, isTrue);
+      expect(ref.customOptions, isNotNull);
+    });
+
+    test('creates typed reranker reference with custom namespace', () {
+      final ref = omlx.reranker('bge-reranker', namespace: 'omlx-studio');
+      expect(ref.name, equals('omlx-studio/bge-reranker'));
+      expect(ref.customOptions, isNotNull);
+    });
   });
 
   group('OmlxModelDefinition', () {
