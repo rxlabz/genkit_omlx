@@ -4,6 +4,8 @@ import '../../api/embed_config.dart';
 import '../../api/embedder_definition.dart';
 import '../../api/generation_config.dart';
 import '../../api/model_definition.dart';
+import '../../api/speech_config.dart';
+import '../../api/transcription_config.dart';
 
 /// Default plugin / namespace name used when no custom name is provided.
 const String defaultOmlxNamespace = 'omlx';
@@ -172,6 +174,30 @@ OmlxModelKind? _classifyFromMetadata(Map<String, dynamic> raw) {
   return null;
 }
 
+/// Returns `true` when [info] declares exclusive media output (`output: ['media']`).
+bool declaresExclusiveMediaOutput(genkit.ModelInfo? info) {
+  final output = info?.supports?['output'];
+  return output is List && output.length == 1 && output.first == 'media';
+}
+
+/// Resolves the effective [OmlxModelKind] for an [OmlxModelDefinition].
+OmlxModelKind resolveModelKind(
+  OmlxModelDefinition definition, {
+  Map<String, dynamic>? raw,
+}) {
+  if (definition.kind != null) {
+    return definition.kind!;
+  }
+  if (declaresExclusiveMediaOutput(definition.modelInfo)) {
+    return OmlxModelKind.speech;
+  }
+  final byModel = classifyModel(definition.model, raw: raw);
+  if (byModel != OmlxModelKind.chat) {
+    return byModel;
+  }
+  return classifyModel(definition.name, raw: raw);
+}
+
 /// Builds capability metadata for an [OmlxModelDefinition].
 genkit.ModelInfo modelInfoFor(OmlxModelDefinition definition) {
   final provided = definition.modelInfo;
@@ -192,6 +218,44 @@ genkit.ModelInfo modelInfoFor(OmlxModelDefinition definition) {
   );
 }
 
+/// Builds capability metadata for a text-to-speech [OmlxModelDefinition].
+genkit.ModelInfo speechModelInfoFor(OmlxModelDefinition definition) {
+  final provided = definition.modelInfo;
+  return genkit.ModelInfo(
+    versions: provided?.versions,
+    label: provided?.label ?? 'oMLX Speech - ${definition.name}',
+    configSchema: provided?.configSchema,
+    supports: <String, dynamic>{
+      'media': false,
+      'output': ['media'],
+      'multiturn': false,
+      'systemRole': false,
+      'tools': false,
+      ...?provided?.supports,
+    },
+    stage: provided?.stage,
+  );
+}
+
+/// Builds capability metadata for a speech-to-text [OmlxModelDefinition].
+genkit.ModelInfo transcriptionModelInfoFor(OmlxModelDefinition definition) {
+  final provided = definition.modelInfo;
+  return genkit.ModelInfo(
+    versions: provided?.versions,
+    label: provided?.label ?? 'oMLX Transcription - ${definition.name}',
+    configSchema: provided?.configSchema,
+    supports: <String, dynamic>{
+      'media': true,
+      'output': ['text', 'json'],
+      'multiturn': false,
+      'systemRole': false,
+      'tools': false,
+      ...?provided?.supports,
+    },
+    stage: provided?.stage,
+  );
+}
+
 /// Builds action metadata for an [OmlxModelDefinition].
 Map<String, dynamic> actionMetadataForModel(
   OmlxModelDefinition definition, {
@@ -204,6 +268,38 @@ Map<String, dynamic> actionMetadataForModel(
     'model': <String, dynamic>{
       ...info.toJson(),
       'customOptions': omlxGenerationConfigSchema().jsonSchema(),
+    },
+  };
+}
+
+/// Builds action metadata for a text-to-speech [OmlxModelDefinition].
+Map<String, dynamic> actionMetadataForSpeechModel(
+  OmlxModelDefinition definition, {
+  genkit.ModelInfo? modelInfo,
+}) {
+  final info = modelInfo ?? speechModelInfoFor(definition);
+  return <String, dynamic>{
+    'label': info.label ?? 'oMLX Speech - ${definition.name}',
+    'description': definition.name,
+    'model': <String, dynamic>{
+      ...info.toJson(),
+      'customOptions': omlxSpeechConfigSchema().jsonSchema(),
+    },
+  };
+}
+
+/// Builds action metadata for a speech-to-text [OmlxModelDefinition].
+Map<String, dynamic> actionMetadataForTranscriptionModel(
+  OmlxModelDefinition definition, {
+  genkit.ModelInfo? modelInfo,
+}) {
+  final info = modelInfo ?? transcriptionModelInfoFor(definition);
+  return <String, dynamic>{
+    'label': info.label ?? 'oMLX Transcription - ${definition.name}',
+    'description': definition.name,
+    'model': <String, dynamic>{
+      ...info.toJson(),
+      'customOptions': omlxTranscriptionConfigSchema().jsonSchema(),
     },
   };
 }
@@ -240,6 +336,34 @@ genkit.ActionMetadata modelActionMetadata(
     actionNameFor(definition.name, namespace: namespace),
     info: info,
     customOptions: omlxGenerationConfigSchema(),
+  );
+}
+
+/// Builds Genkit [genkit.ActionMetadata] for a text-to-speech [OmlxModelDefinition].
+genkit.ActionMetadata speechModelActionMetadata(
+  OmlxModelDefinition definition, {
+  String namespace = defaultOmlxNamespace,
+  genkit.ModelInfo? modelInfo,
+}) {
+  final info = modelInfo ?? speechModelInfoFor(definition);
+  return genkit.modelMetadata(
+    actionNameFor(definition.name, namespace: namespace),
+    info: info,
+    customOptions: omlxSpeechConfigSchema(),
+  );
+}
+
+/// Builds Genkit [genkit.ActionMetadata] for a speech-to-text [OmlxModelDefinition].
+genkit.ActionMetadata transcriptionModelActionMetadata(
+  OmlxModelDefinition definition, {
+  String namespace = defaultOmlxNamespace,
+  genkit.ModelInfo? modelInfo,
+}) {
+  final info = modelInfo ?? transcriptionModelInfoFor(definition);
+  return genkit.modelMetadata(
+    actionNameFor(definition.name, namespace: namespace),
+    info: info,
+    customOptions: omlxTranscriptionConfigSchema(),
   );
 }
 

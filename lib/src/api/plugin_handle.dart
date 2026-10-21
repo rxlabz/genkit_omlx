@@ -8,6 +8,8 @@ import 'embed_config.dart';
 import 'embedder_definition.dart';
 import 'generation_config.dart';
 import 'model_definition.dart';
+import 'speech_config.dart';
+import 'transcription_config.dart';
 
 /// Global handle used to configure and reference the `genkit_omlx` plugin.
 ///
@@ -107,6 +109,40 @@ class OmlxPluginHandle {
     return embedderRef<OmlxEmbedConfig>(
       actionNameFor(name, namespace: namespace),
       customOptions: omlxEmbedConfigSchema(),
+    );
+  }
+
+  /// Returns a typed Genkit text-to-speech model reference for [name]
+  /// (`POST /v1/audio/speech`).
+  ///
+  /// Speech models accept text prompts and return a single audio [MediaPart]
+  /// containing a base64 data URI.
+  ModelRef<OmlxSpeechConfig> speechModel(
+    String name, {
+    String namespace = defaultOmlxNamespace,
+    OmlxSpeechConfig? config,
+  }) {
+    return modelRef<OmlxSpeechConfig>(
+      actionNameFor(name, namespace: namespace),
+      config: config,
+      customOptions: omlxSpeechConfigSchema(),
+    );
+  }
+
+  /// Returns a typed Genkit speech-to-text transcription model reference for
+  /// [name] (`POST /v1/audio/transcriptions`).
+  ///
+  /// Transcription models accept an audio [MediaPart] and return the transcript
+  /// as a single [TextPart].
+  ModelRef<OmlxTranscriptionConfig> transcriptionModel(
+    String name, {
+    String namespace = defaultOmlxNamespace,
+    OmlxTranscriptionConfig? config,
+  }) {
+    return modelRef<OmlxTranscriptionConfig>(
+      actionNameFor(name, namespace: namespace),
+      config: config,
+      customOptions: omlxTranscriptionConfigSchema(),
     );
   }
 }

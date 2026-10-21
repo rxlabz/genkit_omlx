@@ -2,12 +2,15 @@
 ///
 /// This package lets Genkit applications run models hosted on the [oMLX](https://github.com/jundot/omlx)
 /// inference server, supporting streaming, tool calling, structured JSON output,
-/// reasoning models (`<think>` blocks), and text embeddings.
+/// reasoning models (`<think>` blocks), text embeddings, speech synthesis (TTS),
+/// and audio transcription (STT).
 ///
 /// Use [omlx] to:
 ///
 /// - configure a plugin with server parameters and model definitions
 /// - reference a registered or dynamically resolved model via `omlx.model(...)`
+/// - reference a speech synthesis (TTS) model via `omlx.speechModel(...)`
+/// - reference a speech-to-text (STT) model via `omlx.transcriptionModel(...)`
 /// - reference an embedder via `omlx.embedder(...)`
 ///
 /// ```dart
@@ -49,6 +52,16 @@ export 'src/api/generation_config.dart'
         parseOmlxGenerationConfig;
 export 'src/api/model_definition.dart' show OmlxModelDefinition;
 export 'src/api/plugin_handle.dart' show OmlxPluginHandle, omlx;
+export 'src/api/speech_config.dart'
+    show
+        OmlxSpeechConfig,
+        omlxSpeechConfigSchema,
+        parseOmlxSpeechConfig;
+export 'src/api/transcription_config.dart'
+    show
+        OmlxTranscriptionConfig,
+        omlxTranscriptionConfigSchema,
+        parseOmlxTranscriptionConfig;
 export 'src/integration/genkit/action_support.dart'
     show OmlxModelKind, classifyModel, defaultOmlxBaseUrl, defaultOmlxNamespace;
 export 'src/integration/genkit/plugin.dart' show OmlxPlugin;

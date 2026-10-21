@@ -9,6 +9,8 @@ import '../../core/client/omlx_client_manager.dart';
 import 'action_support.dart';
 import 'actions/embedder_action.dart';
 import 'actions/model_action.dart';
+import 'actions/speech_action.dart';
+import 'actions/transcription_action.dart';
 
 final _logger = Logger('genkit_omlx');
 
@@ -72,11 +74,7 @@ class OmlxPlugin extends GenkitPlugin {
     final actions = <Action>[];
 
     for (final def in _models) {
-      final action = buildModelAction(
-        definition: def,
-        clientManager: clientManager,
-        namespace: name,
-      );
+      final action = _buildModelForDefinition(def);
       actions.add(action);
       _resolvedActions[actionNameFor(def.name, namespace: name)] = action;
       _resolvedActions[def.name] = action;
@@ -119,11 +117,7 @@ class OmlxPlugin extends GenkitPlugin {
         orElse: () => OmlxModelDefinition(name: normalizedName),
       )!;
 
-      final action = buildModelAction(
-        definition: definition,
-        clientManager: clientManager,
-        namespace: this.name,
-      );
+      final action = _buildModelForDefinition(definition);
       _resolvedActions[name] = action;
       _resolvedActions[normalizedName] = action;
       return action;
@@ -156,7 +150,7 @@ class OmlxPlugin extends GenkitPlugin {
     for (final def in _models) {
       declaredIds.add(def.name);
       declaredIds.add(def.model);
-      metadataList.add(modelActionMetadata(def, namespace: name));
+      metadataList.add(_metadataForModelDefinition(def));
     }
 
     for (final def in _embedders) {
@@ -177,10 +171,12 @@ class OmlxPlugin extends GenkitPlugin {
           declaredIds.add(m.id);
           final def = OmlxEmbedderDefinition(name: m.id);
           metadataList.add(embedderActionMetadata(def, namespace: name));
-        } else if (kind == OmlxModelKind.chat) {
+        } else if (kind == OmlxModelKind.speech ||
+            kind == OmlxModelKind.transcription ||
+            kind == OmlxModelKind.chat) {
           declaredIds.add(m.id);
           final def = OmlxModelDefinition(name: m.id);
-          metadataList.add(modelActionMetadata(def, namespace: name));
+          metadataList.add(_metadataForModelDefinition(def, raw: m.raw));
         }
       }
     } catch (e, stackTrace) {
@@ -192,5 +188,42 @@ class OmlxPlugin extends GenkitPlugin {
     }
 
     return metadataList;
+  }
+
+  Model _buildModelForDefinition(OmlxModelDefinition definition) {
+    return switch (resolveModelKind(definition)) {
+      OmlxModelKind.speech => buildSpeechModelAction(
+        definition: definition,
+        clientManager: clientManager,
+        namespace: name,
+      ),
+      OmlxModelKind.transcription => buildTranscriptionModelAction(
+        definition: definition,
+        clientManager: clientManager,
+        namespace: name,
+      ),
+      _ => buildModelAction(
+        definition: definition,
+        clientManager: clientManager,
+        namespace: name,
+      ),
+    };
+  }
+
+  ActionMetadata _metadataForModelDefinition(
+    OmlxModelDefinition definition, {
+    Map<String, dynamic>? raw,
+  }) {
+    return switch (resolveModelKind(definition, raw: raw)) {
+      OmlxModelKind.speech => speechModelActionMetadata(
+        definition,
+        namespace: name,
+      ),
+      OmlxModelKind.transcription => transcriptionModelActionMetadata(
+        definition,
+        namespace: name,
+      ),
+      _ => modelActionMetadata(definition, namespace: name),
+    };
   }
 }

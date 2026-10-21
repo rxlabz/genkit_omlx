@@ -72,6 +72,50 @@ void main() {
       expect(ref.name, equals('omlx-studio/bge-micro'));
       expect(ref.customOptions, isNotNull);
     });
+
+    test('creates typed speech model reference', () {
+      final ref = omlx.speechModel(
+        'kokoro',
+        config: OmlxSpeechConfig(
+          voice: 'af_heart',
+          responseFormat: 'wav',
+          speed: 1.1,
+        ),
+      );
+      expect(ref.name, equals('omlx/kokoro'));
+      expect(ref.config?.voice, equals('af_heart'));
+      expect(ref.config?.responseFormat, equals('wav'));
+      expect(ref.config?.speed, equals(1.1));
+      expect(ref.customOptions, isNotNull);
+    });
+
+    test('creates typed speech model reference with custom namespace', () {
+      final ref = omlx.speechModel('kokoro', namespace: 'omlx-studio');
+      expect(ref.name, equals('omlx-studio/kokoro'));
+      expect(ref.customOptions, isNotNull);
+    });
+
+    test('creates typed transcription model reference', () {
+      final ref = omlx.transcriptionModel(
+        'whisper',
+        config: OmlxTranscriptionConfig(
+          language: 'en',
+          responseFormat: 'verbose_json',
+          temperature: 0.0,
+        ),
+      );
+      expect(ref.name, equals('omlx/whisper'));
+      expect(ref.config?.language, equals('en'));
+      expect(ref.config?.responseFormat, equals('verbose_json'));
+      expect(ref.config?.temperature, equals(0.0));
+      expect(ref.customOptions, isNotNull);
+    });
+
+    test('creates typed transcription model reference with custom namespace', () {
+      final ref = omlx.transcriptionModel('whisper', namespace: 'omlx-studio');
+      expect(ref.name, equals('omlx-studio/whisper'));
+      expect(ref.customOptions, isNotNull);
+    });
   });
 
   group('OmlxModelDefinition', () {

@@ -18,6 +18,10 @@ void main() async {
         name: 'Qwen27',
         model: 'mlx-community/Qwen3.8-27B-4bit',
       ),
+      OmlxModelDefinition(
+        name: 'kokoro',
+        model: 'mlx-community/Kokoro-82M-bf16',
+      ),
     ],
     embedders: const [
       OmlxEmbedderDefinition(
@@ -112,6 +116,38 @@ void main() async {
     );
   } catch (e) {
     print('Embedding test skipped: $e\n');
+  }
+
+  print('=== 6. Text-to-Speech (TTS) ===');
+  try {
+    final speech = await ai.generate(
+      model: omlx.speechModel(
+        'kokoro',
+        config: OmlxSpeechConfig(
+          voice: 'af_heart',
+          responseFormat: 'wav',
+          speed: 1.0,
+        ),
+      ),
+      prompt:
+          'Apple Silicon delivers blazing fast inference with unified memory.',
+    );
+
+    final media = speech.media;
+    if (media != null) {
+      print('Synthesized audio MIME type: ${media.contentType}');
+      final uri = Uri.parse(media.url);
+      final audioBytes = uri.data?.contentAsBytes();
+      if (audioBytes != null) {
+        final outputFile = File('speech.wav');
+        await outputFile.writeAsBytes(audioBytes);
+        print(
+          'Saved audio to: ${outputFile.path} (${audioBytes.length} bytes)\n',
+        );
+      }
+    }
+  } catch (e) {
+    print('TTS skipped: $e\n');
   }
 
   await plugin.dispose();

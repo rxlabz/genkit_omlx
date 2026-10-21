@@ -81,7 +81,7 @@ void main() {
       expect(names, contains('omlx/deepseek-r1-distill-qwen-7b'));
     });
 
-    test('classifies discovered models into chat models and embedders', () async {
+    test('classifies discovered models into chat, speech, transcription, and embedders', () async {
       final mockClient = MockClient((request) async {
         if (request.url.path == '/v1/models') {
           final payload = {
@@ -90,6 +90,8 @@ void main() {
               {'id': 'qwen2.5-coder-7b', 'object': 'model'},
               {'id': 'bge-m3', 'object': 'model'},
               {'id': 'nomic-embed-text', 'object': 'model'},
+              {'id': 'mlx-community/Kokoro-82M-bf16', 'object': 'model'},
+              {'id': 'mlx-community/whisper-large-v3-turbo', 'object': 'model'},
             ],
           };
           return http.Response(
@@ -104,17 +106,35 @@ void main() {
       final plugin = omlx(httpClient: mockClient);
       final metadataList = await plugin.list();
 
-      final chatModels = metadataList
+      final models = metadataList
           .where((m) => m.actionType == ActionType.model)
-          .map((m) => m.name)
           .toList();
+      final modelNames = models.map((m) => m.name).toList();
       final embedders = metadataList
           .where((m) => m.actionType == ActionType.embedder)
           .toList();
 
-      expect(chatModels, contains('omlx/qwen2.5-coder-7b'));
+      expect(modelNames, contains('omlx/qwen2.5-coder-7b'));
+      expect(modelNames, contains('omlx/mlx-community/Kokoro-82M-bf16'));
+      expect(modelNames, contains('omlx/mlx-community/whisper-large-v3-turbo'));
       expect(embedders.map((e) => e.name), contains('omlx/bge-m3'));
       expect(embedders.map((e) => e.name), contains('omlx/nomic-embed-text'));
+
+      final kokoroMeta = models.firstWhere(
+        (m) => m.name == 'omlx/mlx-community/Kokoro-82M-bf16',
+      );
+      expect(
+        (kokoroMeta.metadata['model'] as Map<String, dynamic>)['supports']['output'],
+        equals(['media']),
+      );
+
+      final whisperMeta = models.firstWhere(
+        (m) => m.name == 'omlx/mlx-community/whisper-large-v3-turbo',
+      );
+      expect(
+        (whisperMeta.metadata['model'] as Map<String, dynamic>)['supports']['media'],
+        isTrue,
+      );
 
       final bgeMeta = embedders.firstWhere((e) => e.name == 'omlx/bge-m3');
       expect(bgeMeta.inputSchema, isNotNull);

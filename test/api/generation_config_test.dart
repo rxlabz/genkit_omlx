@@ -94,4 +94,59 @@ void main() {
       expect(properties.containsKey('user'), isTrue);
     });
   });
+
+  group('OmlxSpeechConfig', () {
+    test('parses camelCase and snake_case fields correctly', () {
+      final config = parseOmlxSpeechConfig({
+        'version': 'mlx-community/Kokoro-82M-bf16',
+        'voice': 'af_heart',
+        'response_format': 'wav',
+        'speed': 1.25,
+      });
+
+      expect(config.version, equals('mlx-community/Kokoro-82M-bf16'));
+      expect(config.voice, equals('af_heart'));
+      expect(config.responseFormat, equals('wav'));
+      expect(config.speed, equals(1.25));
+    });
+
+    test('provides Dev UI JSON schema with speed bounds', () {
+      final schema = omlxSpeechConfigSchema().jsonSchema();
+      expect(schema['type'], equals('object'));
+      final properties = schema['properties'] as Map<String, dynamic>;
+      expect(properties.containsKey('voice'), isTrue);
+      expect(properties.containsKey('response_format'), isTrue);
+      expect(properties['speed']['minimum'], equals(0.25));
+      expect(properties['speed']['maximum'], equals(4.0));
+    });
+  });
+
+  group('OmlxTranscriptionConfig', () {
+    test('parses camelCase and snake_case fields correctly', () {
+      final config = parseOmlxTranscriptionConfig({
+        'version': 'mlx-community/whisper-large-v3-turbo',
+        'language': 'fr',
+        'prompt': 'Technical glossary',
+        'response_format': 'verbose_json',
+        'temperature': 0.1,
+      });
+
+      expect(config.version, equals('mlx-community/whisper-large-v3-turbo'));
+      expect(config.language, equals('fr'));
+      expect(config.prompt, equals('Technical glossary'));
+      expect(config.responseFormat, equals('verbose_json'));
+      expect(config.temperature, equals(0.1));
+    });
+
+    test('provides Dev UI JSON schema with temperature bounds', () {
+      final schema = omlxTranscriptionConfigSchema().jsonSchema();
+      expect(schema['type'], equals('object'));
+      final properties = schema['properties'] as Map<String, dynamic>;
+      expect(properties.containsKey('language'), isTrue);
+      expect(properties.containsKey('prompt'), isTrue);
+      expect(properties.containsKey('response_format'), isTrue);
+      expect(properties['temperature']['minimum'], equals(0.0));
+      expect(properties['temperature']['maximum'], equals(1.0));
+    });
+  });
 }
