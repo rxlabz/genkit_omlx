@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:genkit/genkit.dart';
@@ -55,7 +56,7 @@ void main() {
       );
 
       final ai = Genkit(plugins: [plugin]);
-      final response = await ai.generate(
+      final response = await ai.generate<void, OmlxGenerationConfig>(
         model: omlx.model('qwen'),
         prompt: 'Why Apple Silicon?',
         config: OmlxGenerationConfig(temperature: 0.7),
@@ -102,7 +103,7 @@ void main() {
       );
 
       final ai = Genkit(plugins: [plugin]);
-      final stream = ai.generateStream(
+      final stream = ai.generateStream<void, OmlxGenerationConfig>(
         model: omlx.model('qwen'),
         prompt: 'Say hello',
       );
@@ -157,7 +158,7 @@ void main() {
       );
 
       final ai = Genkit(plugins: [plugin]);
-      final response = await ai.generate(
+      final response = await ai.generate<void, OmlxGenerationConfig>(
         model: omlx.model('deepseek-r1'),
         prompt: 'What is sqrt(9801)?',
       );
@@ -222,7 +223,7 @@ void main() {
       );
 
       final ai = Genkit(plugins: [plugin]);
-      final response = await ai.generate(
+      final response = await ai.generate<void, OmlxGenerationConfig>(
         model: omlx.model('qwen'),
         prompt: 'Weather in Cupertino?',
         tools: [weatherTool],
@@ -337,13 +338,13 @@ void main() {
       );
 
       final ai = Genkit(plugins: [plugin]);
-      final stream = ai.generateStream(
+      final stream = ai.generateStream<void, OmlxGenerationConfig>(
         model: omlx.model('qwen'),
         prompt: 'Weather in Paris?',
         returnToolRequests: true,
       );
 
-      final receivedChunks = <GenerateResponseChunk>[];
+      final receivedChunks = <GenerateResponseChunk<dynamic>>[];
       await for (final chunk in stream) {
         receivedChunks.add(chunk);
       }
@@ -403,7 +404,7 @@ void main() {
 
       // Verify ai.generate surfaces the mapped status on the failed response
       final ai = Genkit(plugins: [plugin]);
-      final result = await ai.generate(
+      final result = await ai.generate<void, OmlxGenerationConfig>(
         model: omlx.model('qwen'),
         prompt: 'Hello',
       );
@@ -491,7 +492,7 @@ void main() {
       );
 
       final ai = Genkit(plugins: [plugin]);
-      await ai.generate(
+      await ai.generate<void, OmlxGenerationConfig>(
         model: omlx.model('qwen'),
         prompt: 'Hi',
         config: OmlxGenerationConfig(
@@ -501,6 +502,85 @@ void main() {
 
       final decoded = jsonDecode(capturedBody) as Map<String, dynamic>;
       expect(decoded['model'], equals('qwen2.5-coder-32b-instruct-4bit'));
+    });
+
+    test('handles mid-stream SSE error with code insufficient_memory as resourceExhausted', () async {
+      final mockClient = MockClient.streaming((request, bodyStream) async {
+        final sseData = [
+          'data: {"id":"c1","created":123456,"model":"qwen","choices":[{"index":0,"delta":{"role":"assistant","content":"Generating..."}}]}\n\n',
+          'event: error\n',
+          'data: {"message":"GPU out of memory allocating KV cache","code":"insufficient_memory"}\n\n',
+        ];
+        return http.StreamedResponse(
+          Stream.fromIterable(sseData.map(utf8.encode)),
+          200,
+          headers: {'content-type': 'text/event-stream'},
+        );
+      });
+
+      final plugin = omlx(
+        httpClient: mockClient,
+        models: const [OmlxModelDefinition(name: 'qwen')],
+      );
+
+      await plugin.init();
+      final model = plugin.resolve(ActionType.model, 'qwen') as Model;
+
+      expect(
+        () => model(
+          ModelRequest(
+            messages: [
+              Message(role: Role.user, content: [TextPart(text: 'Generate huge text')]),
+            ],
+          ),
+          onChunk: (_) {},
+        ),
+        throwsA(
+          isA<GenkitException>().having(
+            (e) => e.status,
+            'status',
+            equals(StatusCode.resourceExhausted),
+          ),
+        ),
+      );
+    });
+
+    test('handles mid-stream SSE timeout as deadlineExceeded', () async {
+      final controller = StreamController<List<int>>();
+      addTearDown(() async {
+        if (!controller.isClosed) await controller.close();
+      });
+
+      final mockClient = MockClient.streaming((request, bodyStream) async {
+        return http.StreamedResponse(controller.stream, 200, headers: {'content-type': 'text/event-stream'});
+      });
+
+      final plugin = omlx(
+        httpClient: mockClient,
+        timeout: const Duration(milliseconds: 50),
+        models: const [OmlxModelDefinition(name: 'qwen')],
+      );
+
+      await plugin.init();
+      final model = plugin.resolve(ActionType.model, 'qwen') as Model;
+
+      expect(
+        () => model(
+          ModelRequest(
+            messages: [
+              Message(role: Role.user, content: [TextPart(text: 'Waiting forever')]),
+            ],
+          ),
+          onChunk: (_) {},
+        ),
+        throwsA(
+          isA<GenkitException>().having(
+            (e) => e.status,
+            'status',
+            equals(StatusCode.deadlineExceeded),
+          ),
+        ),
+      );
     });
 
     test('preserves raw completion payload in ModelResponse.raw', () async {
@@ -531,7 +611,7 @@ void main() {
       );
 
       final ai = Genkit(plugins: [plugin]);
-      final response = await ai.generate(
+      final response = await ai.generate<void, OmlxGenerationConfig>(
         model: omlx.model('qwen'),
         prompt: 'Hi',
       );

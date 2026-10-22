@@ -1,17 +1,19 @@
 # genkit_omlx
 
-A [Google Genkit](https://github.com/genkit-ai/genkit-dart) plugin for running local LLMs and embeddings on Apple Silicon via **[oMLX](https://github.com/jundot/omlx)** and **[domlx](https://github.com/jundot/omlx)**.
+A [Google Genkit](https://github.com/genkit-ai/genkit-dart) plugin for running local LLMs and embeddings on Apple Silicon via **[oMLX](https://github.com/jundot/omlx)** and **[domlx](https://github.com/rxlabz/domlx)**.
 
 ## Features
 
 - **Apple Silicon Acceleration**: Harness macOS Unified Memory Architecture (UMA) and MLX for fast local inference.
-- **Full Chat Completion & Streaming**: Non-streaming and real-time Server-Sent Events (SSE) token streaming.
+- **Full Chat Completion & Streaming**: Non-streaming and real-time Server-Sent Events (SSE) token streaming with inactivity timeout safety.
 - **Reasoning Models (`<think>` blocks)**: First-class extraction and streaming of internal reasoning content (e.g. DeepSeek-R1, Qwen 2.5) surfaced as Genkit `ReasoningPart`.
 - **Tool & Function Calling**: Multi-turn tool execution with automatic argument decoding and message history normalization.
 - **Structured Outputs (JSON Schema)**: Constrained grammar generation using OpenAI-compatible JSON Schema validation.
 - **Text Embeddings**: Batch embedding vector generation via `/v1/embeddings`.
+- **Speech Synthesis (TTS) & Audio Transcription (STT)**: Direct support for Kokoro/F5-TTS (`omlx.speechModel(...)`) and Whisper (`omlx.transcriptionModel(...)`).
+- **Semantic Document Reranking**: Cross-encoder document scoring via `/v1/rerank` (`omlx.reranker(...)` / `ai.rerank(...)`).
 - **Dynamic Model Resolution**: Resolve models on-the-fly (`omlx.model('...')`) without requiring upfront registration.
-- **Local Model Discovery**: Discovers and advertises models available in the local oMLX engine pool (`/v1/models`).
+- **Unified Memory & Model Lifecycle**: Health inspection (`plugin.health()`), engine status (`plugin.modelsStatus()`), and explicit memory eviction (`plugin.unloadModel(...)`).
 
 ---
 
@@ -21,7 +23,7 @@ Add `genkit_omlx` and `genkit` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  genkit: ^0.17.0
+  genkit: ^1.0.0
   genkit_omlx:
     path: path/to/genkit_omlx
 ```

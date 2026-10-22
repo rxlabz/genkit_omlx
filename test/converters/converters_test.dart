@@ -230,6 +230,7 @@ void main() {
           completionTokens: 30,
           totalTokens: 45,
           cachedTokens: 10,
+          promptTokensDetails: omlx.PromptTokensDetails(cachedTokens: 10),
         ),
       );
 
@@ -259,6 +260,10 @@ void main() {
       expect(response.usage?.outputTokens, equals(30.0));
       expect(response.usage?.totalTokens, equals(45.0));
       expect(response.usage?.cachedContentTokens, equals(10.0));
+      expect(
+        response.usage?.custom?['promptTokensDetails'],
+        equals({'cached_tokens': 10}),
+      );
     });
 
     test('converts streaming chunk with delta text and reasoning', () {

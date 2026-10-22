@@ -328,7 +328,7 @@ Map<String, dynamic> actionMetadataForEmbedder(
 }
 
 /// Builds Genkit [genkit.ActionMetadata] for an [OmlxModelDefinition].
-genkit.ActionMetadata modelActionMetadata(
+genkit.ActionMetadata<dynamic, dynamic, dynamic, dynamic> modelActionMetadata(
   OmlxModelDefinition definition, {
   String namespace = defaultOmlxNamespace,
   genkit.ModelInfo? modelInfo,
@@ -342,7 +342,7 @@ genkit.ActionMetadata modelActionMetadata(
 }
 
 /// Builds Genkit [genkit.ActionMetadata] for a text-to-speech [OmlxModelDefinition].
-genkit.ActionMetadata speechModelActionMetadata(
+genkit.ActionMetadata<dynamic, dynamic, dynamic, dynamic> speechModelActionMetadata(
   OmlxModelDefinition definition, {
   String namespace = defaultOmlxNamespace,
   genkit.ModelInfo? modelInfo,
@@ -356,7 +356,7 @@ genkit.ActionMetadata speechModelActionMetadata(
 }
 
 /// Builds Genkit [genkit.ActionMetadata] for a speech-to-text [OmlxModelDefinition].
-genkit.ActionMetadata transcriptionModelActionMetadata(
+genkit.ActionMetadata<dynamic, dynamic, dynamic, dynamic> transcriptionModelActionMetadata(
   OmlxModelDefinition definition, {
   String namespace = defaultOmlxNamespace,
   genkit.ModelInfo? modelInfo,
@@ -370,7 +370,7 @@ genkit.ActionMetadata transcriptionModelActionMetadata(
 }
 
 /// Builds Genkit [genkit.ActionMetadata] for an [OmlxEmbedderDefinition].
-genkit.ActionMetadata embedderActionMetadata(
+genkit.ActionMetadata<dynamic, dynamic, dynamic, dynamic> embedderActionMetadata(
   OmlxEmbedderDefinition definition, {
   String namespace = defaultOmlxNamespace,
 }) {
@@ -427,7 +427,7 @@ Map<String, dynamic> actionMetadataForReranker(
 }
 
 /// Builds Genkit [genkit.ActionMetadata] for an [OmlxRerankerDefinition].
-genkit.ActionMetadata rerankerActionMetadata(
+genkit.ActionMetadata<dynamic, dynamic, dynamic, dynamic> rerankerActionMetadata(
   OmlxRerankerDefinition definition, {
   String namespace = defaultOmlxNamespace,
 }) {

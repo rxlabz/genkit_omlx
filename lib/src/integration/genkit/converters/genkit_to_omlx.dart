@@ -6,6 +6,78 @@ import 'package:genkit/plugin.dart' as genkit;
 import 'package:schemantic/schemantic.dart';
 
 /// Converts Genkit messages to oMLX [omlx.ChatMessage] objects.
+///
+/// Any local `file://` or filesystem image media parts are read asynchronously
+/// without blocking the isolate event loop.
+Future<List<omlx.ChatMessage>> toOmlxMessagesAsync(
+  List<genkit.Message> messages,
+) async {
+  final converted = <omlx.ChatMessage>[];
+
+  for (final message in messages) {
+    if (message.role == genkit.Role.tool) {
+      final toolResponses = message.content
+          .where((part) => part.isToolResponse && part.toolResponse != null)
+          .map((part) => part.toolResponse!)
+          .toList(growable: false);
+
+      if (toolResponses.isEmpty) {
+        throw genkit.GenkitException(
+          'Tool messages must contain at least one tool response part.',
+          status: genkit.StatusCode.invalidArgument,
+        );
+      }
+
+      for (final resp in toolResponses) {
+        converted.add(
+          omlx.ChatMessage.tool(
+            toolCallId: resp.ref ?? '',
+            content: _normalizeToolOutput(resp.output),
+          ),
+        );
+      }
+      continue;
+    }
+
+    if (message.role == genkit.Role.system) {
+      final text = message.content
+          .where((part) => part.isText)
+          .map((part) => part.text ?? '')
+          .join('\n');
+      converted.add(omlx.ChatMessage.system(text));
+      continue;
+    }
+
+    if (message.role == genkit.Role.model) {
+      converted.add(_convertModelMessage(message));
+      continue;
+    }
+
+    // Role.user or custom
+    final hasMedia = message.content.any((part) => part.isMedia);
+    if (!hasMedia) {
+      final text = message.content
+          .where((part) => part.isText)
+          .map((part) => part.text ?? '')
+          .join('\n');
+      converted.add(omlx.ChatMessage.user(text));
+    } else {
+      final parts = <omlx.ContentPart>[];
+      for (final part in message.content) {
+        if (part.isText) {
+          parts.add(omlx.ContentPart.text(part.text ?? ''));
+        } else if (part.isMedia && part.media != null) {
+          parts.add(await _toOmlxImagePartAsync(part.media!));
+        }
+      }
+      converted.add(omlx.ChatMessage.userParts(parts));
+    }
+  }
+
+  return converted;
+}
+
+/// Converts Genkit messages to oMLX [omlx.ChatMessage] objects synchronously.
 List<omlx.ChatMessage> toOmlxMessages(List<genkit.Message> messages) {
   final converted = <omlx.ChatMessage>[];
 
@@ -44,43 +116,7 @@ List<omlx.ChatMessage> toOmlxMessages(List<genkit.Message> messages) {
     }
 
     if (message.role == genkit.Role.model) {
-      final textBuffer = StringBuffer();
-      final reasoningBuffer = StringBuffer();
-      final toolCalls = <omlx.ToolCall>[];
-
-      for (final part in message.content) {
-        if (part.isText) {
-          textBuffer.write(part.text ?? '');
-        } else if (part.isReasoning) {
-          reasoningBuffer.write(part.reasoning ?? '');
-        } else if (part.isToolRequest) {
-          final tr = part.toolRequest;
-          if (tr != null) {
-            final input = tr.input;
-            final argsString = input is String ? input : jsonEncode(input);
-            toolCalls.add(
-              omlx.ToolCall(
-                id: tr.ref ?? 'call_${toolCalls.length}',
-                function: omlx.FunctionCall(
-                  name: tr.name,
-                  arguments: argsString,
-                ),
-              ),
-            );
-          }
-        }
-      }
-
-      final content = textBuffer.toString();
-      final reasoning = reasoningBuffer.toString();
-
-      converted.add(
-        omlx.ChatMessage.assistant(
-          content.isEmpty && toolCalls.isNotEmpty ? null : content,
-          reasoningContent: reasoning.isEmpty ? null : reasoning,
-          toolCalls: toolCalls.isEmpty ? null : toolCalls,
-        ),
-      );
+      converted.add(_convertModelMessage(message));
       continue;
     }
 
@@ -101,11 +137,49 @@ List<omlx.ChatMessage> toOmlxMessages(List<genkit.Message> messages) {
           parts.add(_toOmlxImagePart(part.media!));
         }
       }
-      converted.add(omlx.ChatMessage.user(parts));
+      converted.add(omlx.ChatMessage.userParts(parts));
     }
   }
 
   return converted;
+}
+
+omlx.ChatMessage _convertModelMessage(genkit.Message message) {
+  final textBuffer = StringBuffer();
+  final reasoningBuffer = StringBuffer();
+  final toolCalls = <omlx.ToolCall>[];
+
+  for (final part in message.content) {
+    if (part.isText) {
+      textBuffer.write(part.text ?? '');
+    } else if (part.isReasoning) {
+      reasoningBuffer.write(part.reasoning ?? '');
+    } else if (part.isToolRequest) {
+      final tr = part.toolRequest;
+      if (tr != null) {
+        final input = tr.input;
+        final argsString = input is String ? input : jsonEncode(input);
+        toolCalls.add(
+          omlx.ToolCall(
+            id: tr.ref ?? 'call_${toolCalls.length}',
+            function: omlx.FunctionCall(
+              name: tr.name,
+              arguments: argsString,
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  final content = textBuffer.toString();
+  final reasoning = reasoningBuffer.toString();
+
+  return omlx.ChatMessage.assistant(
+    content.isEmpty && toolCalls.isNotEmpty ? null : content,
+    reasoningContent: reasoning.isEmpty ? null : reasoning,
+    toolCalls: toolCalls.isEmpty ? null : toolCalls,
+  );
 }
 
 /// Converts Genkit tool definitions to oMLX [omlx.Tool] objects.
@@ -170,15 +244,15 @@ Map<String, dynamic> _withRootDefPromoted(Map<String, dynamic> schema) {
 }
 
 /// Resolves tool choice configuration for oMLX.
-dynamic toOmlxToolChoice(genkit.ToolChoice? toolChoice, {required bool hasTools}) {
+Object? toOmlxToolChoice(genkit.ToolChoice? toolChoice, {required bool hasTools}) {
   if (!hasTools) {
     return null;
   }
 
   return switch (toolChoice?.value) {
-    'none' => 'none',
-    'required' => 'required',
-    _ => 'auto',
+    'none' => omlx.ToolChoice.none,
+    'required' => omlx.ToolChoice.required,
+    _ => omlx.ToolChoice.auto,
   };
 }
 
@@ -265,6 +339,36 @@ String documentToPlainText(genkit.DocumentData document, {int? index}) {
   }
 
   return text;
+}
+
+Future<omlx.ContentPart> _toOmlxImagePartAsync(genkit.Media media) async {
+  final url = media.url;
+  final uri = Uri.tryParse(url);
+
+  // If already data URI or remote HTTP URL, pass directly
+  if (url.startsWith('data:') ||
+      (uri != null && (uri.scheme == 'http' || uri.scheme == 'https'))) {
+    return omlx.ContentPart.imageUrl(url);
+  }
+
+  // Handle local file URI or path asynchronously
+  try {
+    final filePath = (uri != null && uri.scheme == 'file')
+        ? uri.toFilePath()
+        : url;
+    final file = File(filePath);
+    if (await file.exists()) {
+      final bytes = await file.readAsBytes();
+      final base64String = base64Encode(bytes);
+      final mime =
+          media.contentType ?? _inferMimeType(filePath) ?? 'image/jpeg';
+      return omlx.ContentPart.imageUrl('data:$mime;base64,$base64String');
+    }
+  } catch (_) {
+    // Fallback to passing the URL directly
+  }
+
+  return omlx.ContentPart.imageUrl(url);
 }
 
 omlx.ContentPart _toOmlxImagePart(genkit.Media media) {

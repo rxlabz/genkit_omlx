@@ -121,7 +121,7 @@ genkit.GenerationUsage? toGenkitUsage(omlx.Usage? usage) {
     if (usage.generationDuration != null)
       'generationDuration': usage.generationDuration,
     if (usage.promptTokensDetails != null)
-      'promptTokensDetails': usage.promptTokensDetails,
+      'promptTokensDetails': usage.promptTokensDetails!.toJson(),
   };
 
   return genkit.GenerationUsage(

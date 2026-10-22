@@ -3,12 +3,15 @@ import 'dart:io';
 import 'package:genkit/genkit.dart';
 import 'package:genkit_omlx/genkit_omlx.dart';
 
+// Optionally read API key from OMLX_API_KEY environment variable.
+const apiKey = String.fromEnvironment('OMLX_API_KEY');
+
 void main() async {
   // 1. Initialize the oMLX plugin
   // Connects to local oMLX inference server running on Apple Silicon (default: http://localhost:8000)
   final plugin = omlx(
     baseUrl: 'http://localhost:8000',
-    apiKey: 'sk-omlx-kjM1F8KZXQCvmB30RQyHjMVS',
+    apiKey: apiKey,
     models: const [
       OmlxModelDefinition(
         name: 'Qwen9',
@@ -42,7 +45,7 @@ void main() async {
 
   print('=== 1. Basic Generation ===');
   try {
-    final response = await ai.generate(
+    final response = await ai.generate<void, OmlxGenerationConfig>(
       model: omlx.model('Qwen9'),
       prompt: 'Explain Apple Silicon unified memory in two concise sentences.',
       config: OmlxGenerationConfig(temperature: 0.7),
@@ -55,7 +58,7 @@ void main() async {
 
   print('=== 2. Streaming Generation ===');
   try {
-    final stream = ai.generateStream(
+    final stream = ai.generateStream<void, OmlxGenerationConfig>(
       model: omlx.model('Qwen9'),
       prompt: 'Write a short haiku about Apple M-series chips.',
     );
@@ -70,7 +73,7 @@ void main() async {
 
   print('=== 3. Reasoning Models (<think> extraction) ===');
   try {
-    final response = await ai.generate(
+    final response = await ai.generate<void, OmlxGenerationConfig>(
       model: omlx.model('Qwen9'),
       prompt: 'How many r\'s are in the word "strawberry"?',
     );
@@ -99,7 +102,7 @@ void main() async {
       },
     );
 
-    final response = await ai.generate(
+    final response = await ai.generate<void, OmlxGenerationConfig>(
       model: omlx.model('Qwen9'),
       prompt: 'What is the weather in Tokyo?',
       tools: [weatherTool],
@@ -126,7 +129,7 @@ void main() async {
 
   print('=== 6. Text-to-Speech (TTS) ===');
   try {
-    final speech = await ai.generate(
+    final speech = await ai.generate<void, OmlxSpeechConfig>(
       model: omlx.speechModel(
         'kokoro',
         config: OmlxSpeechConfig(

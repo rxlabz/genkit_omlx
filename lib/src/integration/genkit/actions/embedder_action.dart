@@ -45,9 +45,9 @@ genkit.Embedder<OmlxEmbedConfig> buildEmbedderAction({
           );
 
           final response = await clientManager.client.embeddings.create(
-            omlx.EmbeddingRequest(
+            omlx.EmbeddingRequest.batch(
               model: definition.model,
-              input: batch,
+              texts: batch,
               dimensions: config.dimensions ?? definition.dimensions,
               user: config.user,
             ),

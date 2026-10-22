@@ -78,8 +78,8 @@ class OmlxPlugin extends GenkitPlugin {
   final List<OmlxEmbedderDefinition> _embedders;
   final List<OmlxRerankerDefinition> _rerankers;
 
-  final Map<String, Action> _resolvedActions = {};
-  List<Action>? _initializedActions;
+  final Map<String, Action<dynamic, dynamic, dynamic, dynamic>> _resolvedActions = {};
+  List<Action<dynamic, dynamic, dynamic, dynamic>>? _initializedActions;
 
   /// Disposes the plugin and closes any open HTTP connections.
   Future<void> dispose() async {
@@ -206,12 +206,12 @@ class OmlxPlugin extends GenkitPlugin {
   }
 
   @override
-  Future<List<Action>> init() async {
+  Future<List<Action<dynamic, dynamic, dynamic, dynamic>>> init() async {
     if (_initializedActions != null) {
       return _initializedActions!;
     }
 
-    final actions = <Action>[];
+    final actions = <Action<dynamic, dynamic, dynamic, dynamic>>[];
 
     for (final def in _models) {
       final action = _buildModelForDefinition(def);
@@ -239,12 +239,12 @@ class OmlxPlugin extends GenkitPlugin {
       _resolvedActions[_cacheKey(omlxRerankerActionType, def.name)] = action;
     }
 
-    _initializedActions = List<Action>.unmodifiable(actions);
+    _initializedActions = List<Action<dynamic, dynamic, dynamic, dynamic>>.unmodifiable(actions);
     return _initializedActions!;
   }
 
   @override
-  Action? resolve(ActionType actionType, String name) {
+  Action<dynamic, dynamic, dynamic, dynamic>? resolve(ActionType actionType, String name) {
     final normalizedName = _stripNamespacePrefix(name);
     final key = _cacheKey(actionType, normalizedName);
 
@@ -299,8 +299,8 @@ class OmlxPlugin extends GenkitPlugin {
   }
 
   @override
-  Future<List<ActionMetadata>> list() async {
-    final metadataList = <ActionMetadata>[];
+  Future<List<ActionMetadata<dynamic, dynamic, dynamic, dynamic>>> list() async {
+    final metadataList = <ActionMetadata<dynamic, dynamic, dynamic, dynamic>>[];
     final declaredIds = <String>{};
 
     for (final def in _models) {
@@ -369,7 +369,7 @@ class OmlxPlugin extends GenkitPlugin {
   String _cacheKey(ActionType actionType, String normalizedName) =>
       '${actionType.value}:$normalizedName';
 
-  Model _buildModelForDefinition(OmlxModelDefinition definition) {
+  Model<dynamic> _buildModelForDefinition(OmlxModelDefinition definition) {
     return switch (resolveModelKind(definition)) {
       OmlxModelKind.speech => buildSpeechModelAction(
         definition: definition,
@@ -389,7 +389,7 @@ class OmlxPlugin extends GenkitPlugin {
     };
   }
 
-  ActionMetadata _metadataForModelDefinition(
+  ActionMetadata<dynamic, dynamic, dynamic, dynamic> _metadataForModelDefinition(
     OmlxModelDefinition definition, {
     Map<String, dynamic>? raw,
   }) {

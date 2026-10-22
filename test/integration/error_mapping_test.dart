@@ -20,6 +20,28 @@ void main() {
       );
     });
 
+    test('maps OmlxApiException with code insufficient_memory and HTTP 500 to resourceExhausted', () {
+      final error = OmlxApiException(
+        statusCode: 500,
+        code: 'insufficient_memory',
+        message: 'GPU out of memory mid-stream',
+      );
+      final genkitEx = toGenkitException(error);
+      expect(genkitEx.status, equals(StatusCode.resourceExhausted));
+      expect(genkitEx.message, contains('GPU out of memory mid-stream'));
+    });
+
+    test('maps OmlxApiException with code context_length_exceeded to invalidArgument', () {
+      final error = OmlxApiException(
+        statusCode: 500,
+        code: 'context_length_exceeded',
+        message: 'Context length exceeded',
+      );
+      final genkitEx = toGenkitException(error);
+      expect(genkitEx.status, equals(StatusCode.invalidArgument));
+      expect(genkitEx.message, contains('Context length exceeded'));
+    });
+
     test('maps OmlxApiException 409 to aborted (Model reload/swap conflict)', () {
       final error = OmlxApiException(
         statusCode: 409,

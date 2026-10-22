@@ -66,7 +66,9 @@ class OmlxPluginHandle {
     Map<String, String> defaultHeaders = const {},
     String? Function(String name) configVar = getConfigVar,
   }) {
-    final resolvedApiKey = apiKey ?? configVar('OMLX_API_KEY');
+    final resolvedApiKey = (apiKey != null && apiKey.isNotEmpty)
+        ? apiKey
+        : configVar('OMLX_API_KEY');
     final resolvedBaseUrl =
         baseUrl ?? configVar('OMLX_BASE_URL') ?? defaultOmlxBaseUrl;
 

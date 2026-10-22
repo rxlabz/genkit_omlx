@@ -71,7 +71,7 @@ Future<genkit.ModelResponse> _runModel({
 
   final config = parseOmlxGenerationConfig(request.config);
   final wireModel = config.version ?? definition.model;
-  final messages = toOmlxMessages(request.messages);
+  final messages = await toOmlxMessagesAsync(request.messages);
   final tools = toOmlxTools(request.tools);
   final toolChoice = toOmlxToolChoice(
     request.toolChoice,

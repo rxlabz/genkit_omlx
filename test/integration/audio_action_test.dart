@@ -37,7 +37,7 @@ void main() {
         );
 
         final ai = Genkit(plugins: [plugin]);
-        final response = await ai.generate(
+        final response = await ai.generate<void, OmlxSpeechConfig>(
           model: omlx.speechModel(
             'kokoro',
             config: OmlxSpeechConfig(
@@ -79,7 +79,7 @@ void main() {
         final ai = Genkit(plugins: [plugin]);
 
         // Dynamically resolved speech model via heuristic
-        final response = await ai.generate(
+        final response = await ai.generate<void, OmlxSpeechConfig>(
           model: omlx.speechModel('mlx-community/F5-TTS'),
           prompt: 'Default voice test',
         );
@@ -118,11 +118,11 @@ void main() {
         );
 
         final ai = Genkit(plugins: [plugin]);
-        await ai.generate(
+        await ai.generate<void, OmlxSpeechConfig>(
           model: omlx.speechModel('my-voice'),
           prompt: 'Synthesize me',
         );
-        await ai.generate(
+        await ai.generate<void, OmlxSpeechConfig>(
           model: omlx.speechModel('explicit-voice'),
           prompt: 'Synthesize me too',
         );
@@ -242,7 +242,7 @@ void main() {
 
         final ai = Genkit(plugins: [plugin]);
         final audioBase64 = base64Encode([0x52, 0x49, 0x46, 0x46, 0x00, 0x01]);
-        final response = await ai.generate(
+        final response = await ai.generate<void, OmlxTranscriptionConfig>(
           model: omlx.transcriptionModel(
             'whisper',
             config: OmlxTranscriptionConfig(
@@ -299,7 +299,7 @@ void main() {
         final plugin = omlx(httpClient: mockClient);
         final ai = Genkit(plugins: [plugin]);
 
-        final response = await ai.generate(
+        final response = await ai.generate<void, OmlxTranscriptionConfig>(
           model: omlx.transcriptionModel(
             'mlx-community/whisper-large-v3-turbo',
             config: OmlxTranscriptionConfig(responseFormat: 'srt'),

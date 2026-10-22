@@ -41,7 +41,7 @@ genkit.Model<OmlxTranscriptionConfig> buildTranscriptionModelAction({
         );
       }
 
-      final audio = _extractTranscriptionAudio(request);
+      final audio = await _extractTranscriptionAudio(request);
       final wireModel = config.version ?? definition.model;
       final format = config.responseFormat ?? defaultOmlxTranscriptionFormat;
       final promptHint = config.prompt ?? _extractPromptHint(request);
@@ -103,8 +103,8 @@ genkit.Model<OmlxTranscriptionConfig> buildTranscriptionModelAction({
   );
 }
 
-({Uint8List bytes, String mimeType, String filename})
-_extractTranscriptionAudio(genkit.ModelRequest request) {
+Future<({Uint8List bytes, String mimeType, String filename})>
+_extractTranscriptionAudio(genkit.ModelRequest request) async {
   genkit.Media? media;
   for (final message in request.messages) {
     if (message.media != null) {
@@ -160,7 +160,7 @@ _extractTranscriptionAudio(genkit.ModelRequest request) {
         ? uri.toFilePath()
         : url;
     final file = File(filePath);
-    if (file.existsSync()) {
+    if (await file.exists()) {
       final mimeType =
           (media.contentType ?? inferAudioMimeType(filePath) ?? '')
               .split(';')
@@ -175,7 +175,7 @@ _extractTranscriptionAudio(genkit.ModelRequest request) {
         );
       }
 
-      final bytes = file.readAsBytesSync();
+      final bytes = await file.readAsBytes();
       if (bytes.isEmpty) {
         throw genkit.GenkitException(
           'Audio file is empty: $filePath',

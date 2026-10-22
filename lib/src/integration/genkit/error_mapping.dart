@@ -13,8 +13,11 @@ genkit.GenkitException toGenkitException(Object error, [StackTrace? stackTrace])
 
   if (error is omlx.OmlxApiException) {
     final status = switch (error.statusCode) {
-      507 => genkit.StatusCode.resourceExhausted,
-      409 => genkit.StatusCode.aborted,
+      _ when error.isInsufficientMemory => genkit.StatusCode.resourceExhausted,
+      _ when error.isConflict => genkit.StatusCode.aborted,
+      _ when error.code == 'context_length_exceeded' ||
+          error.errorType == 'invalid_request_error' =>
+        genkit.StatusCode.invalidArgument,
       _ => genkit.StatusCode.fromHttpStatus(error.statusCode),
     };
 
