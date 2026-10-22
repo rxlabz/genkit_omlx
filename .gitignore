@@ -12,3 +12,5 @@ js/
 pubspec.lock
 
 .genkit/
+
+.DS_Store

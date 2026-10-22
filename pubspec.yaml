@@ -1,15 +1,13 @@
 name: genkit_omlx
 description: Genkit Dart plugin for running local models through oMLX on Apple Silicon.
 version: 1.0.0
-publish_to: none
 
 environment:
   sdk: ">=3.13.0 <4.0.0"
 
 dependencies:
-  domlx:
-    path: /Users/rx/dev/labz/locallm/locallm/domlx
-  genkit: ^1.0.0
+  domlx: ^1.0.1
+  genkit: ^1.0.1
   http: ^1.6.0
   logging: ^1.2.0
   schemantic: ^1.0.0
