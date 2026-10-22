@@ -1,6 +1,7 @@
 name: genkit_omlx
 description: Genkit Dart plugin for running local models through oMLX on Apple Silicon.
 version: 1.0.0
+repository: https://github.com/rxlabz/genkit_omlx
 
 environment:
   sdk: ">=3.13.0 <4.0.0"
