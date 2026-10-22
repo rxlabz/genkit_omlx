@@ -109,12 +109,14 @@ class OmlxPluginHandle {
   ///
   /// The [name] can be either a declared [OmlxEmbedderDefinition.name] or any
   /// embedding model supported by the oMLX server.
-  EmbedderRef<OmlxEmbedConfig> embedder(
+  OmlxEmbedderRef<OmlxEmbedConfig> embedder(
     String name, {
     String namespace = defaultOmlxNamespace,
+    OmlxEmbedConfig? config,
   }) {
-    return embedderRef<OmlxEmbedConfig>(
+    return OmlxEmbedderRef<OmlxEmbedConfig>(
       actionNameFor(name, namespace: namespace),
+      config: config,
       customOptions: omlxEmbedConfigSchema(),
     );
   }

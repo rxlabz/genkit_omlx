@@ -42,6 +42,32 @@ void main() {
       expect(genkitEx.message, contains('Context length exceeded'));
     });
 
+    test('maps OmlxApiException with model_not_found, invalid_api_key, and rate_limit_exceeded codes', () {
+      final notFound = OmlxApiException(
+        statusCode: 500,
+        code: 'model_not_found',
+        message: 'Model not found mid-stream',
+      );
+      expect(toGenkitException(notFound).status, equals(StatusCode.notFound));
+
+      final unauth = OmlxApiException(
+        statusCode: 500,
+        code: 'invalid_api_key',
+        message: 'Invalid API key',
+      );
+      expect(toGenkitException(unauth).status, equals(StatusCode.unauthenticated));
+
+      final rateLimited = OmlxApiException(
+        statusCode: 500,
+        code: 'rate_limit_exceeded',
+        message: 'Rate limit exceeded',
+      );
+      expect(
+        toGenkitException(rateLimited).status,
+        equals(StatusCode.resourceExhausted),
+      );
+    });
+
     test('maps OmlxApiException 409 to aborted (Model reload/swap conflict)', () {
       final error = OmlxApiException(
         statusCode: 409,

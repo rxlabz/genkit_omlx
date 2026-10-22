@@ -76,6 +76,7 @@ Future<genkit.ModelResponse> _runModel({
   final toolChoice = toOmlxToolChoice(
     request.toolChoice,
     hasTools: tools != null && tools.isNotEmpty,
+    toolChoiceFunction: config.toolChoiceFunction,
   );
   final responseFormat = toOmlxResponseFormat(
     request.output,

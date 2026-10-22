@@ -244,9 +244,20 @@ Map<String, dynamic> _withRootDefPromoted(Map<String, dynamic> schema) {
 }
 
 /// Resolves tool choice configuration for oMLX.
-Object? toOmlxToolChoice(genkit.ToolChoice? toolChoice, {required bool hasTools}) {
+///
+/// If [toolChoiceFunction] is provided and non-empty, forces the model to call
+/// that specific function via [omlx.ToolChoice.function].
+Object? toOmlxToolChoice(
+  genkit.ToolChoice? toolChoice, {
+  required bool hasTools,
+  String? toolChoiceFunction,
+}) {
   if (!hasTools) {
     return null;
+  }
+
+  if (toolChoiceFunction != null && toolChoiceFunction.trim().isNotEmpty) {
+    return omlx.ToolChoice.function(toolChoiceFunction.trim());
   }
 
   return switch (toolChoice?.value) {

@@ -24,8 +24,18 @@ base class OmlxEmbedConfig {
 
   OmlxEmbedConfig._(this._json);
 
-  OmlxEmbedConfig({int? dimensions, String? user}) {
-    _json = {'dimensions': ?dimensions, 'user': ?user};
+  OmlxEmbedConfig({
+    String? version,
+    int? dimensions,
+    String? encodingFormat,
+    String? user,
+  }) {
+    _json = {
+      'version': ?version,
+      'dimensions': ?dimensions,
+      'encoding_format': ?encodingFormat,
+      'user': ?user,
+    };
   }
 
   late final Map<String, dynamic> _json;
@@ -33,6 +43,20 @@ base class OmlxEmbedConfig {
   /// The JSON schema and type descriptor for [OmlxEmbedConfig].
   static const SchemanticType<OmlxEmbedConfig> $schema =
       _OmlxEmbedConfigTypeFactory();
+
+  /// Optional wire model identifier override (e.g. `'BAAI/bge-m3'`).
+  String? get version {
+    return _json['version'] as String?;
+  }
+
+  /// Optional wire model identifier override (e.g. `'BAAI/bge-m3'`).
+  set version(String? value) {
+    if (value == null) {
+      _json.remove('version');
+    } else {
+      _json['version'] = value;
+    }
+  }
 
   /// Length of the returned vector.
   int? get dimensions {
@@ -45,6 +69,20 @@ base class OmlxEmbedConfig {
       _json.remove('dimensions');
     } else {
       _json['dimensions'] = value;
+    }
+  }
+
+  /// Optional encoding format for the returned embeddings (`'float'` or `'base64'`).
+  String? get encodingFormat {
+    return _json['encoding_format'] as String?;
+  }
+
+  /// Optional encoding format for the returned embeddings (`'float'` or `'base64'`).
+  set encodingFormat(String? value) {
+    if (value == null) {
+      _json.remove('encoding_format');
+    } else {
+      _json['encoding_format'] = value;
     }
   }
 
@@ -88,7 +126,12 @@ base class _OmlxEmbedConfigTypeFactory extends SchemanticType<OmlxEmbedConfig> {
       'type': 'object',
       'description': 'Request-time embedding options for oMLX models.',
       'properties': <String, Object?>{
+        'version': <String, Object?>{'type': 'string'},
         'dimensions': <String, Object?>{'type': 'integer', 'minimum': 1},
+        'encoding_format': <String, Object?>{
+          'type': 'string',
+          'enum': <Object?>['float', 'base64'],
+        },
         'user': <String, Object?>{'type': 'string'},
       },
     },

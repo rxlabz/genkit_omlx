@@ -1,4 +1,5 @@
-import 'package:genkit/genkit.dart' show ModelInfo;
+import 'package:genkit/genkit.dart' show EmbedderRef, ModelInfo;
+import 'package:schemantic/schemantic.dart';
 
 /// Static configuration for an oMLX embedding model registered with Genkit.
 ///
@@ -32,4 +33,23 @@ class OmlxEmbedderDefinition {
 
   /// Optional Genkit [ModelInfo] metadata override.
   final ModelInfo? modelInfo;
+}
+
+/// Typed reference to an oMLX embedder action.
+class OmlxEmbedderRef<CustomOptions> implements EmbedderRef<CustomOptions> {
+  /// Creates a reference to an oMLX embedder action.
+  const OmlxEmbedderRef(
+    this.name, {
+    this.config,
+    this.customOptions,
+  });
+
+  @override
+  final String name;
+
+  /// Optional default options attached to this reference.
+  final CustomOptions? config;
+
+  @override
+  final SchemanticType<CustomOptions>? customOptions;
 }

@@ -37,6 +37,7 @@ base class OmlxGenerationConfig {
     String? user,
     bool? jsonMode,
     bool? strictJsonSchema,
+    String? toolChoiceFunction,
     Map<String, dynamic>? extra,
   }) {
     _json = {
@@ -50,6 +51,7 @@ base class OmlxGenerationConfig {
       'user': ?user,
       'jsonMode': ?jsonMode,
       'strictJsonSchema': ?strictJsonSchema,
+      'toolChoiceFunction': ?toolChoiceFunction,
       'extra': ?extra,
     };
   }
@@ -200,6 +202,20 @@ base class OmlxGenerationConfig {
     }
   }
 
+  /// Forces the model to call a specific tool function by name (using `ToolChoice.function(...)`).
+  String? get toolChoiceFunction {
+    return _json['toolChoiceFunction'] as String?;
+  }
+
+  /// Forces the model to call a specific tool function by name (using `ToolChoice.function(...)`).
+  set toolChoiceFunction(String? value) {
+    if (value == null) {
+      _json.remove('toolChoiceFunction');
+    } else {
+      _json['toolChoiceFunction'] = value;
+    }
+  }
+
   /// Additional custom or vendor-specific oMLX parameters.
   Map<String, dynamic>? get extra {
     return (_json['extra'] as Map?)?.cast<String, dynamic>();
@@ -265,6 +281,7 @@ base class _OmlxGenerationConfigTypeFactory
         'user': <String, Object?>{'type': 'string'},
         'jsonMode': <String, Object?>{'type': 'boolean'},
         'strictJsonSchema': <String, Object?>{'type': 'boolean'},
+        'toolChoiceFunction': <String, Object?>{'type': 'string'},
         'extra': <String, Object?>{
           'type': 'object',
           'additionalProperties': <String, Object?>{},

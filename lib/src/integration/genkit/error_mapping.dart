@@ -13,8 +13,18 @@ genkit.GenkitException toGenkitException(Object error, [StackTrace? stackTrace])
 
   if (error is omlx.OmlxApiException) {
     final status = switch (error.statusCode) {
-      _ when error.isInsufficientMemory => genkit.StatusCode.resourceExhausted,
+      _ when error.isInsufficientMemory ||
+          error.code == 'rate_limit_exceeded' =>
+        genkit.StatusCode.resourceExhausted,
       _ when error.isConflict => genkit.StatusCode.aborted,
+      _ when error.isModelNotFound ||
+          error.code == 'model_not_found' ||
+          error.errorType == 'not_found_error' =>
+        genkit.StatusCode.notFound,
+      _ when error.isUnauthorized ||
+          error.code == 'invalid_api_key' ||
+          error.errorType == 'authentication_error' =>
+        genkit.StatusCode.unauthenticated,
       _ when error.code == 'context_length_exceeded' ||
           error.errorType == 'invalid_request_error' =>
         genkit.StatusCode.invalidArgument,

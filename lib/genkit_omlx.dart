@@ -54,7 +54,8 @@ export 'src/api/embed_config.dart'
         OmlxEmbedConfig,
         omlxEmbedConfigSchema,
         parseOmlxEmbedConfig;
-export 'src/api/embedder_definition.dart' show OmlxEmbedderDefinition;
+export 'src/api/embedder_definition.dart'
+    show OmlxEmbedderDefinition, OmlxEmbedderRef;
 export 'src/api/generation_config.dart'
     show
         OmlxGenerationConfig,

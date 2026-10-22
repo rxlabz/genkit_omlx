@@ -29,6 +29,7 @@ genkit.Embedder<OmlxEmbedConfig> buildEmbedderAction({
       }
 
       final config = parseOmlxEmbedConfig(request.options);
+      final wireModel = config.version ?? definition.model;
       final texts = <String>[];
       for (var i = 0; i < request.input.length; i++) {
         texts.add(documentToPlainText(request.input[i], index: i));
@@ -46,8 +47,9 @@ genkit.Embedder<OmlxEmbedConfig> buildEmbedderAction({
 
           final response = await clientManager.client.embeddings.create(
             omlx.EmbeddingRequest.batch(
-              model: definition.model,
+              model: wireModel,
               texts: batch,
+              encodingFormat: config.encodingFormat,
               dimensions: config.dimensions ?? definition.dimensions,
               user: config.user,
             ),

@@ -52,6 +52,9 @@ abstract class $OmlxGenerationConfig {
   /// Whether to enforce strict JSON Schema validation (defaults to false).
   bool? get strictJsonSchema;
 
+  /// Forces the model to call a specific tool function by name (using `ToolChoice.function(...)`).
+  String? get toolChoiceFunction;
+
   /// Additional custom or vendor-specific oMLX parameters.
   Map<String, dynamic>? get extra;
 }
@@ -88,6 +91,8 @@ Map<String, dynamic> normalizeOmlxGenerationConfig(Map<String, dynamic> raw) {
     'strictJsonSchema',
     'strict_json_schema',
     'strict',
+    'toolChoiceFunction',
+    'tool_choice_function',
     'extra',
   };
 
@@ -152,6 +157,12 @@ Map<String, dynamic> normalizeOmlxGenerationConfig(Map<String, dynamic> raw) {
       raw['strictJsonSchema'] ?? raw['strict_json_schema'] ?? raw['strict'];
   if (strictVal is bool) {
     normalized['strictJsonSchema'] = strictVal;
+  }
+
+  final toolChoiceFnVal =
+      raw['toolChoiceFunction'] ?? raw['tool_choice_function'];
+  if (toolChoiceFnVal is String && toolChoiceFnVal.isNotEmpty) {
+    normalized['toolChoiceFunction'] = toolChoiceFnVal;
   }
 
   if (extraMap.isNotEmpty) {

@@ -62,8 +62,18 @@ void main() {
     });
 
     test('creates typed embedder reference', () {
-      final ref = omlx.embedder('bge-micro');
+      final ref = omlx.embedder(
+        'bge-micro',
+        config: OmlxEmbedConfig(
+          version: 'BAAI/bge-m3',
+          dimensions: 384,
+          encodingFormat: 'float',
+        ),
+      );
       expect(ref.name, equals('omlx/bge-micro'));
+      expect(ref.config?.version, equals('BAAI/bge-m3'));
+      expect(ref.config?.dimensions, equals(384));
+      expect(ref.config?.encodingFormat, equals('float'));
       expect(ref.customOptions, isNotNull);
     });
 

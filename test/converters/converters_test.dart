@@ -207,6 +207,30 @@ void main() {
       expect(rfStrict!.type, equals('json_schema'));
       expect(rfStrict.jsonSchema?['strict'], isTrue);
     });
+
+    test('resolves toolChoice including specific function override', () {
+      expect(toOmlxToolChoice(null, hasTools: false), isNull);
+      expect(toOmlxToolChoice(null, hasTools: true), equals('auto'));
+      expect(
+        toOmlxToolChoice(genkit.ToolChoice.none, hasTools: true),
+        equals('none'),
+      );
+      expect(
+        toOmlxToolChoice(genkit.ToolChoice.required, hasTools: true),
+        equals('required'),
+      );
+      expect(
+        toOmlxToolChoice(
+          null,
+          hasTools: true,
+          toolChoiceFunction: 'get_weather',
+        ),
+        equals({
+          'type': 'function',
+          'function': {'name': 'get_weather'},
+        }),
+      );
+    });
   });
 
   group('omlx_to_genkit converters', () {

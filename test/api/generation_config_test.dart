@@ -21,6 +21,7 @@ void main() {
         'max_tokens': 1024,
         'stop': ['<|endoftext|>'],
         'user': 'user_123',
+        'tool_choice_function': 'get_weather',
       });
 
       expect(config.temperature, equals(0.7));
@@ -30,6 +31,7 @@ void main() {
       expect(config.maxTokens, equals(1024));
       expect(config.stop, equals(['<|endoftext|>']));
       expect(config.user, equals('user_123'));
+      expect(config.toolChoiceFunction, equals('get_weather'));
     });
 
     test('preserves extra custom vendor options', () {
@@ -73,15 +75,21 @@ void main() {
 
     test('parses fields and serializes to json', () {
       final config = parseOmlxEmbedConfig({
+        'version': 'BAAI/bge-m3',
         'dimensions': 768,
+        'encodingFormat': 'float',
         'user': 'test_user',
       });
 
+      expect(config.version, equals('BAAI/bge-m3'));
       expect(config.dimensions, equals(768));
+      expect(config.encodingFormat, equals('float'));
       expect(config.user, equals('test_user'));
 
       final json = config.toJson();
+      expect(json['version'], equals('BAAI/bge-m3'));
       expect(json['dimensions'], equals(768));
+      expect(json['encoding_format'], equals('float'));
       expect(json['user'], equals('test_user'));
     });
 
